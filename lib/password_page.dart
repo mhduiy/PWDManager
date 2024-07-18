@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pwd_manager_flutter/password_edit_full_dialog.dart';
 
 class PasswordPage extends StatefulWidget {
   const PasswordPage({super.key, required this.title});
@@ -32,7 +33,9 @@ Widget _buildItem(BuildContext context, int index, Animation<double> animation) 
   return SizeTransition(
     sizeFactor: animation,
     child: InkWell(
-      onTap: (){},
+      onTap: (){
+        showEditPasswordFullDialog(context);
+      },
       splashColor: Theme.of(context).colorScheme.inversePrimary.withOpacity(0.3),
       child: Padding(
         padding: const EdgeInsets.all(4.0),
