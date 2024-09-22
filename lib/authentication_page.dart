@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 
 class AuthenticationPage extends StatefulWidget {
   const AuthenticationPage({super.key, required this.title});

@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'password_page.dart';
@@ -24,8 +23,8 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      // home: const MainFrame(title: 'PWD 管理器'),
-      home: const AuthenticationPage(title: ""),
+      home: const MainFrame(title: 'PWD 管理器'),
+      // home: const AuthenticationPage(title: ""),
     );
   }
 }
@@ -61,11 +60,19 @@ class MainFrameState extends State<MainFrame> {
     final List<int> items = List<int>.generate(100, (int index) => index);
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
+        title: Text(widget.title, style: TextStyle(fontSize: 18),),
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
+            icon: const Icon(Icons.search_outlined, size: 22,),
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) {
+                return AuthenticationPage(title: "锁定");
+              }));
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings, size: 22,),
             onPressed: () {
               Navigator.push(context, MaterialPageRoute(builder: (context) {
                 return MyPage(title: "我的");
@@ -85,11 +92,6 @@ class MainFrameState extends State<MainFrame> {
       floatingActionButton: SpeedDial(
         animatedIcon: AnimatedIcons.menu_close,
         children: [
-          SpeedDialChild(
-            child: Icon(Icons.delete),
-            label: '删除记录',
-            onTap: () => print('First tapped'),
-          ),
           SpeedDialChild(
             child: Icon(Icons.add),
             label: '添加记录',
