@@ -23,7 +23,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MainFrame(title: 'PWD 管理器'),
+      home: const AuthenticationPage(title: "锁定")
       // home: const AuthenticationPage(title: ""),
     );
   }
@@ -38,7 +38,7 @@ class MainFrame extends StatefulWidget {
 }
 
 // MyHomePage 对应的状态类
-class MainFrameState extends State<MainFrame> {
+class MainFrameState extends State<MainFrame> with WidgetsBindingObserver  {
   int _selectedIndex = 0;
 
   static const List<Widget> _widgetOptions = <Widget>[
@@ -64,9 +64,10 @@ class MainFrameState extends State<MainFrame> {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.search_outlined, size: 22,),
+      // search_outlined
+            icon: const Icon(Icons.lock, size: 22,),
             onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) {
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) {
                 return AuthenticationPage(title: "锁定");
               }));
             },

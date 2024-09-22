@@ -87,14 +87,17 @@ class PasswordPageState extends State<PasswordPage> {
                   color: Theme.of(context).colorScheme.primary,
                   shape: BoxShape.circle,
                 ),
+                child: Center(
+                  child: Text(password.purpose[0], style: const TextStyle(fontSize: 15, color: Colors.white)),
+                ),
               ),
               const SizedBox(width: 8.0),
               Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(password.purpose, style: const TextStyle(fontSize: 16)),
-                    Text(password.account, style: const TextStyle(fontSize: 12, color: Color(0xFF008C8C)))
+                    Text(password.purpose, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text(password.account, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.primary)),
                   ]),
               const Spacer(), // 使用 Spacer 来推挤
               TextButton(onPressed: () {
