@@ -68,7 +68,7 @@ class PasswordPageState extends State<PasswordPage> {
       sizeFactor: animation,
       child: InkWell(
         onTap: (){
-          showEditPasswordFullDialog(context);
+          showEditPasswordFullDialog(context, isEdit: true, id: passwords[index].id!);
         },
         onLongPress: () {
           _showDeleteConfirmationDialog(context, index);

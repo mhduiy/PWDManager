@@ -61,6 +61,10 @@ class AuthenticationPageState extends State<AuthenticationPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_canCheckBiometrics) {
+      _authenticateWithBiometrics();
+    }
+
     return Scaffold(
       body: Center(
         child: Column(
