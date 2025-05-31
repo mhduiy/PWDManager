@@ -1,16 +1,72 @@
-# pwd_manager_flutter
+# PWDManager
 
-A new Flutter project.
+一个安全、美观、易用的密码管理器应用程序。
 
-## Getting Started
+## 功能特点
 
-This project is a starting point for a Flutter application.
+- 🔐 安全存储：使用高级加密标准（AES）加密所有密码数据
+- 🔍 快速搜索：轻松查找已保存的密码
+- 👆 生物认证：支持指纹解锁（在支持的设备上）
+- 🎨 美观界面：采用Material Design设计，提供流畅的动画效果
+- 📱 跨平台支持：支持Android、iOS、Linux、Windows和macOS
+- 🔒 防护功能：内置截屏防护，保护您的敏感信息
+- 💾 数据备份：支持密码数据的导入导出功能
 
-A few resources to get you started if this is your first Flutter project:
+## 安全特性
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+- 使用AES-256加密算法
+- 支持生物认证（指纹）
+- 应用内截屏防护
+- 自动锁定功能
+- 密码数据本地存储
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 使用说明
+
+1. 首次使用时，设置一个6位数字主密码
+2. 可以选择启用指纹解锁功能（如设备支持）
+3. 在主界面可以添加、编辑、删除密码
+4. 使用搜索功能快速找到需要的密码
+5. 在设置中可以：
+   - 修改主密码
+   - 开启/关闭指纹解锁
+   - 导入/导出密码数据
+   - 调整安全设置
+
+## 开发环境
+
+- Flutter 3.4.3
+- Dart SDK >=3.4.3
+- 支持的平台：Android、iOS、Linux、Windows、macOS
+
+## 依赖说明
+
+主要依赖包括：
+- sqflite: 数据库支持
+- local_auth: 生物认证
+- encrypt: 数据加密
+- window_manager: 截屏防护
+- path_provider: 文件管理
+- file_picker: 文件选择
+
+## 安装说明
+
+1. 确保已安装Flutter开发环境
+2. 克隆项目代码
+3. 运行以下命令安装依赖：
+   ```bash
+   flutter pub get
+   ```
+4. 运行应用：
+   ```bash
+   flutter run
+   ```
+
+## 注意事项
+
+- 请妥善保管主密码，忘记主密码将无法恢复已保存的密码数据
+- 建议定期备份密码数据
+- 在公共场所使用时注意周围环境，防止密码泄露
+
+## 许可证
+
+本项目采用 MIT 许可证

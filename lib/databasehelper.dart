@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
+import 'dart:io';
 
 class DatabaseHelper extends ChangeNotifier {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -16,6 +18,11 @@ class DatabaseHelper extends ChangeNotifier {
 
   DatabaseHelper._internal() {
     _encrypter = encrypt.Encrypter(encrypt.AES(_key));
+    // 初始化数据库
+    if (Platform.isLinux || Platform.isWindows) {
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+    }
   }
 
   Future<Database> get database async {
@@ -159,5 +166,11 @@ class DatabaseHelper extends ChangeNotifier {
     );
     notifyListeners(); // 通知监听者数据已更改
     return result;
+  }
+
+  Future<void> clearAllData() async {
+    Database db = await database;
+    await db.delete('passwords');
+    notifyListeners(); // 通知监听者数据已更改
   }
 }

@@ -1,4 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:flutter/services.dart';
+import 'package:local_auth/local_auth.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+import 'password_auth.dart';
+import 'databasehelper.dart';
+import 'main.dart';
+import 'backup_manager.dart';
 
 class MyPage extends StatefulWidget {
   const MyPage({super.key, required this.title});
@@ -13,69 +23,15 @@ class MyPageState extends State<MyPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-
+        title: const Text("设置"),
       ),
-      body: const Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          AvatarWidget(),
-          SizedBox(height: 10),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 0.0, horizontal: 8.0),
-              child: Card(
-                elevation: 2.0,
-                child: SettingsList()
-              ),
-            )
-          ),
-        ],
+      body: const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
+        child: SettingsList(),
       ),
     );
   }
 }
-
-
-class AvatarWidget extends StatelessWidget {
-  const AvatarWidget({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          width: 80.0,
-          height: 80.0,
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary, // 设置圆形的颜色
-            shape: BoxShape.circle,
-          ),
-          child: const Center(
-            child: Text("MY", style: TextStyle(fontSize: 25, color: Colors.white)),
-          ),
-        ),
-        const SizedBox(height: 8.0), // 添加一个间距
-        const Text("艾洋mhduiy"),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            OutlinedButton(onPressed: (){},
-                style: ButtonStyle(padding: WidgetStateProperty.all(const EdgeInsets.all(0)),),
-                child: const Text("编辑资料", style: TextStyle(fontSize: 12))
-            ),
-            const SizedBox(width: 8.0), // 添加一个间距
-            OutlinedButton(onPressed: (){},
-                style: ButtonStyle(padding: WidgetStateProperty.all(const EdgeInsets.all(0)),),
-                child: const Text("退出登录", style: TextStyle(fontSize: 12))
-            ),
-          ],
-        )
-      ],
-    );
-  }
-}
-
 
 class SettingsList extends StatefulWidget {
   const SettingsList({Key? key}) : super(key: key);
@@ -84,105 +40,690 @@ class SettingsList extends StatefulWidget {
   State<SettingsList> createState() => _SettingsListState();
 }
 
-class _SettingsListState extends State<SettingsList> {
-  bool _darkMode = false;
+class _SettingsListState extends State<SettingsList> with SingleTickerProviderStateMixin {
+  bool _hasPassword = false;
+  final TextEditingController _oldPasswordController = TextEditingController();
+  final TextEditingController _newPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
+  bool _isOldPasswordVisible = false;
+  bool _isNewPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
+  final ThemeManager _themeManager = ThemeManager();
+  final SecurityManager _securityManager = SecurityManager();
+  final BackupManager _backupManager = BackupManager();
+  final LocalAuthentication _localAuth = LocalAuthentication();
+  bool _canCheckBiometrics = false;
+  List<BiometricType> _availableBiometrics = [];
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  // 预设的主题颜色
+  final List<Color> _presetColors = [
+    Colors.deepPurple,
+    Colors.blue,
+    Colors.indigo,
+    Colors.teal,
+    Colors.green,
+    Colors.orange,
+    Colors.red,
+    Colors.pink,
+  ];
 
   @override
-  Widget build(BuildContext context) {
-    final List<Map<String, dynamic>> settings = [
-      {
-        "title": "深色模式",
-        "description": "程序配色使用深色模式配色",
-        "switch": true,
-        "value": false,
-      },
-      {
-        "title": "启用云同步",
-        "description": "开启后自动进行云同步，需要事先登录账号",
-        "switch": true,
-        "value": false,
-      },
-      {
-        "title": "使用指纹认证",
-        "description": "使用设备指纹进行认证，安全性会低于密码认证",
-        "switch": true,
-        "value": false,
-      },
-      {
-        "title": "使用人脸认证",
-        "description": "使用设备人脸进行认证，安全性会低于密码认证",
-        "switch": true,
-        "value": false,
-      },
-      {
-        "title": "立即锁定",
-        "description": "当程序不再前台时立即锁定，需要再次认证",
-        "switch": true,
-        "value": false,
-      },
-      {
-        "title": "禁止截图",
-        "description": "程序主界面禁止被截图或录屏",
-        "switch": true,
-        "value": false,
-      },
-      {
-        "title": "销毁所有数据",
-        "description": "立即销毁设备本地以及网络上存储的所有密码数据",
-        "switch": true,
-        "value": false,
-      },
-      {
-        "title": "测试项",
-        "description": "测试测试测试",
-        "switch": true,
-        "value": false,
-      },
-      {
-        "title": "测试项",
-        "description": "测试测试测试",
-        "switch": true,
-        "value": false,
-      },
-    ];
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _animation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    );
+    _controller.forward();
+    _checkPasswordStatus();
+    _checkBiometricSupport();
+    _themeManager.addListener(_themeListener);
+    _securityManager.addListener(_themeListener);
+  }
 
-    return ListView.builder(
-      shrinkWrap: true,
-      itemCount: settings.length,
-      itemBuilder: (context, index) {
-        return SettingItem(
-          title: settings[index]['title'],
-          description: settings[index]['description'],
-          // switchValue: settings[index]['value'],
-          onChanged: (value) {
-            setState(() {
-              settings[index]['value'] = value;
-              if (settings[index]['title'] == "深色模式") {
-                if (value) {
-                  // MyApp.of(context)!.setDarkMode();
-                } else {
-                  // MyApp.of(context)!.setLightMode();
-                }
-              }
-            });
-          },
+  @override
+  void dispose() {
+    _controller.dispose();
+    _themeManager.removeListener(_themeListener);
+    _securityManager.removeListener(_themeListener);
+    super.dispose();
+  }
+
+  void _themeListener() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _checkPasswordStatus() async {
+    final hasPassword = await PasswordAuth.hasPassword();
+    setState(() {
+      _hasPassword = hasPassword;
+    });
+  }
+
+  Future<void> _checkBiometricSupport() async {
+    bool canCheckBiometrics = false;
+    List<BiometricType> availableBiometrics = [];
+    
+    try {
+      canCheckBiometrics = await _localAuth.canCheckBiometrics;
+      if (canCheckBiometrics) {
+        availableBiometrics = await _localAuth.getAvailableBiometrics();
+      }
+    } on PlatformException {
+      canCheckBiometrics = false;
+    }
+
+    setState(() {
+      _canCheckBiometrics = canCheckBiometrics;
+      _availableBiometrics = availableBiometrics;
+    });
+  }
+
+  void _showChangePasswordDialog() {
+    _oldPasswordController.clear();
+    _newPasswordController.clear();
+    _confirmPasswordController.clear();
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(_hasPassword ? '修改密码' : '设置密码'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_hasPassword)
+                    TextField(
+                      controller: _oldPasswordController,
+                      obscureText: !_isOldPasswordVisible,
+                      maxLength: 6,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: '当前密码',
+                        counterText: '',
+                        helperText: '请输入6位数字密码',
+                        errorText: _oldPasswordController.text.length > 0 && 
+                                 _oldPasswordController.text.length != 6 
+                                 ? '密码必须是6位数字' : null,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _isOldPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _isOldPasswordVisible = !_isOldPasswordVisible;
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                  if (_hasPassword)
+                    const SizedBox(height: 10),
+                  TextField(
+                    controller: _newPasswordController,
+                    obscureText: !_isNewPasswordVisible,
+                    maxLength: 6,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: '新密码',
+                      counterText: '',
+                      helperText: '请输入6位数字密码',
+                      errorText: _newPasswordController.text.length > 0 && 
+                               _newPasswordController.text.length != 6 
+                               ? '密码必须是6位数字' : null,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _isNewPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _isNewPasswordVisible = !_isNewPasswordVisible;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _confirmPasswordController,
+                    obscureText: !_isConfirmPasswordVisible,
+                    maxLength: 6,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: '确认新密码',
+                      counterText: '',
+                      helperText: '请再次输入6位数字密码',
+                      errorText: _confirmPasswordController.text.length > 0 && 
+                               _confirmPasswordController.text.length != 6 
+                               ? '密码必须是6位数字' : null,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _isConfirmPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('取消'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _clearPasswordFields();
+                  },
+                ),
+                TextButton(
+                  child: const Text('确认'),
+                  onPressed: () async {
+                    // 验证密码长度
+                    if (_newPasswordController.text.length != 6 ||
+                        _confirmPasswordController.text.length != 6 ||
+                        (_hasPassword && _oldPasswordController.text.length != 6)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('密码必须是6位数字')),
+                      );
+                      return;
+                    }
+
+                    // 验证是否是数字
+                    final RegExp digitOnly = RegExp(r'^\d+$');
+                    if (!digitOnly.hasMatch(_newPasswordController.text) ||
+                        !digitOnly.hasMatch(_confirmPasswordController.text) ||
+                        (_hasPassword && !digitOnly.hasMatch(_oldPasswordController.text))) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('密码只能包含数字')),
+                      );
+                      return;
+                    }
+
+                    if (_newPasswordController.text != _confirmPasswordController.text) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('两次输入的新密码不一致')),
+                      );
+                      return;
+                    }
+
+                    if (_hasPassword) {
+                      final bool isValid = await PasswordAuth.verifyPassword(_oldPasswordController.text);
+                      if (!isValid) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('当前密码错误')),
+                        );
+                        return;
+                      }
+                    }
+                    
+                    await PasswordAuth.setPassword(_newPasswordController.text);
+                    Navigator.of(context).pop();
+                    _clearPasswordFields();
+                    setState(() {
+                      _hasPassword = true;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(_hasPassword ? '密码修改成功' : '密码设置成功')),
+                    );
+                  },
+                ),
+              ],
+            );
+          }
         );
       },
     );
+  }
+
+  void _clearPasswordFields() {
+    _oldPasswordController.clear();
+    _newPasswordController.clear();
+    _confirmPasswordController.clear();
+  }
+
+  Widget _buildSettingSection({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return FadeTransition(
+      opacity: _animation,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.1),
+          end: Offset.zero,
+        ).animate(_animation),
+        child: Card(
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          elevation: 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ListTile(
+                leading: Icon(
+                  icon,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 28,
+                ),
+                title: Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                subtitle: Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.bodySmall?.color,
+                  ),
+                ),
+              ),
+              const Divider(height: 1),
+              ...children,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildColorCircle(Color color, bool isSelected) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _themeManager.setThemeColor(color);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: isSelected ? 44 : 40,
+        height: isSelected ? 44 : 40,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(isSelected ? 0.4 : 0.3),
+              blurRadius: isSelected ? 8 : 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportData() async {
+    try {
+      final directory = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final backupFile = File('${directory.path}/pwdmanager_backup_$timestamp.pwd');
+      
+      // 导出数据
+      await _backupManager.exportData();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('备份文件已保存到: ${backupFile.path}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('导出失败: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  Future<void> _importData() async {
+    try {
+      final directory = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
+      final files = directory.listSync().where((file) => 
+        file.path.endsWith('.pwd') && 
+        file is File
+      ).toList();
+      
+      if (files.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('未找到备份文件')),
+          );
+        }
+        return;
+      }
+      
+      // 按修改时间排序，最新的在前
+      files.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+      
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('选择要导入的备份文件'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: files.length,
+                  itemBuilder: (context, index) {
+                    final file = files[index];
+                    final fileName = file.path.split('/').last;
+                    final modifiedDate = file.statSync().modified;
+                    
+                    return ListTile(
+                      title: Text(fileName),
+                      subtitle: Text('修改时间: ${modifiedDate.toString()}'),
+                      onTap: () async {
+                        Navigator.of(context).pop();
+                        try {
+                          await _backupManager.importData(file.path);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('导入成功')),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('导入失败: ${e.toString()}')),
+                            );
+                          }
+                        }
+                      },
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('取消'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('导入失败: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      children: [
+        _buildSettingSection(
+          title: '外观',
+          subtitle: '自定义应用的外观',
+          icon: Icons.palette,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.brightness_auto),
+              title: const Text('跟随系统主题'),
+              trailing: Switch(
+                value: _themeManager.followSystem,
+                onChanged: (bool value) {
+                  HapticFeedback.lightImpact();
+                  _themeManager.setThemeMode(
+                    followSystem: value,
+                    darkMode: value 
+                      ? MediaQuery.of(context).platformBrightness == Brightness.dark
+                      : _themeManager.darkMode,
+                  );
+                },
+              ),
+            ),
+            if (!_themeManager.followSystem)
+              ListTile(
+                leading: const Icon(Icons.dark_mode),
+                title: const Text('暗黑主题'),
+                trailing: Switch(
+                  value: _themeManager.darkMode,
+                  onChanged: (bool value) {
+                    HapticFeedback.lightImpact();
+                    _themeManager.setThemeMode(darkMode: value);
+                  },
+                ),
+              ),
+            ListTile(
+              title: const Text('主题颜色'),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              subtitle: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                child: Row(
+                  children: _presetColors.map((color) => 
+                    _buildColorCircle(color, color == _themeManager.themeColor)
+                  ).toList(),
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        _buildSettingSection(
+          title: '备份',
+          subtitle: '导出或导入您的密码数据',
+          icon: Icons.backup,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.file_download),
+              title: const Text('导出数据'),
+              subtitle: const Text('将密码数据导出为加密文件'),
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                _exportData();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.file_upload),
+              title: const Text('导入数据'),
+              subtitle: const Text('从加密文件导入密码数据'),
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                _importData();
+              },
+            ),
+          ],
+        ),
+
+        _buildSettingSection(
+          title: '安全',
+          subtitle: '保护您的数据安全',
+          icon: Icons.security,
+          children: [
+            if (_canCheckBiometrics && _availableBiometrics.isNotEmpty && _hasPassword)
+              ListTile(
+                leading: const Icon(Icons.fingerprint),
+                title: const Text('指纹解锁'),
+                subtitle: const Text('使用指纹快速解锁应用'),
+                trailing: Switch(
+                  value: _securityManager.enableBiometric,
+                  onChanged: (bool value) {
+                    HapticFeedback.lightImpact();
+                    _securityManager.setEnableBiometric(value);
+                  },
+                ),
+              ),
+            ListTile(
+              leading: const Icon(Icons.no_photography),
+              title: const Text('防止截屏'),
+              subtitle: const Text('在显示敏感信息时禁用截屏'),
+              trailing: Switch(
+                value: _securityManager.preventScreenshot,
+                onChanged: (bool value) {
+                  HapticFeedback.lightImpact();
+                  _securityManager.setPreventScreenshot(value);
+                },
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.lock),
+              title: Text(_hasPassword ? '修改密码' : '设置密码'),
+              subtitle: _hasPassword 
+                ? const Text('修改应用解锁密码')
+                : const Text('请设置密码以保护您的数据安全', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                _showChangePasswordDialog();
+              },
+            ),
+            if (_hasPassword)
+              ListTile(
+                leading: const Icon(Icons.no_encryption),
+                title: const Text('清除密码'),
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  _showClearPasswordDialog();
+                },
+              ),
+            if (_hasPassword)
+              ListTile(
+                leading: const Icon(Icons.restore),
+                title: const Text('重置密码'),
+                subtitle: const Text('忘记密码时使用，将清除所有数据'),
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  _showResetPasswordDialog();
+                },
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _showClearPasswordDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('确认清除密码'),
+          content: const Text('清除密码后，任何人都可以直接访问您的数据。确定要继续吗？'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('取消'),
+              onPressed: () {
+                Navigator.of(context).pop(false);
+              },
+            ),
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('确定'),
+              onPressed: () {
+                Navigator.of(context).pop(true);
+              },
+            ),
+          ],
+        );
+      },
+    ).then((confirm) async {
+      if (confirm == true) {
+        await PasswordAuth.clearPassword();
+        setState(() {
+          _hasPassword = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('密码已清除')),
+          );
+        }
+      }
+    });
+  }
+
+  void _showResetPasswordDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('警告'),
+          content: const Text('重置密码将会清除所有存储的密码数据！此操作不可恢复，确定要继续吗？'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('取消'),
+              onPressed: () {
+                Navigator.of(context).pop(false);
+              },
+            ),
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('确定重置'),
+              onPressed: () {
+                Navigator.of(context).pop(true);
+              },
+            ),
+          ],
+        );
+      },
+    ).then((confirm) async {
+      if (confirm == true) {
+        await PasswordAuth.clearPassword();
+        final dbHelper = DatabaseHelper();
+        await dbHelper.clearAllData();
+        
+        setState(() {
+          _hasPassword = false;
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('密码已重置，所有数据已清除')),
+          );
+        }
+      }
+    });
   }
 }
 
 class SettingItem extends StatefulWidget {
   final String title;
   final String description;
-  final ValueChanged<bool> onChanged;
+  final bool showSwitch;
+  final VoidCallback? onTap;
+  final ValueChanged<bool>? onChanged;
 
-  SettingItem({
+  const SettingItem({
     super.key,
     required this.title,
     required this.description,
-    // required this.switchValue,
-    required this.onChanged,
+    this.showSwitch = true,
+    this.onTap,
+    this.onChanged,
   });
 
   @override
@@ -191,26 +732,34 @@ class SettingItem extends StatefulWidget {
 
 class _SettingItemState extends State<SettingItem> {
   bool switchValue = true;
+  
   void changeSwitchState(bool status) {
     setState(() {
       switchValue = !switchValue;
     });
+    if (widget.onChanged != null) {
+      widget.onChanged!(switchValue);
+    }
   }
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 0.0, horizontal: 4.0),
-      child: ListTile(
+    return InkWell(
+      onTap: widget.onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 0.0, horizontal: 4.0),
+        child: ListTile(
           title: Text(widget.title),
           subtitle: Text(
             widget.description,
             style: TextStyle(color: Colors.black.withAlpha(100)),
           ),
-          trailing: Switch(
+          trailing: widget.showSwitch ? Switch(
             value: switchValue,
             onChanged: changeSwitchState,
-          ),
+          ) : null,
         ),
+      ),
     );
   }
 }

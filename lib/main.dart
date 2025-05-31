@@ -1,30 +1,158 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:window_manager/window_manager.dart';
+import 'dart:io';
 import 'password_page.dart';
 import 'my_page.dart';
 import 'password_edit_full_dialog.dart';
 import 'authentication_page.dart';
+import 'password_auth.dart';
+
+// 全局主题管理器
+class ThemeManager extends ChangeNotifier {
+  static final ThemeManager _instance = ThemeManager._internal();
+  factory ThemeManager() => _instance;
+
+  bool _followSystem = true;
+  bool _darkMode = false;
+  Color _themeColor = Colors.deepPurple;
+
+  bool get followSystem => _followSystem;
+  bool get darkMode => _darkMode;
+  Color get themeColor => _themeColor;
+
+  ThemeManager._internal() {
+    _loadThemeSettings();
+  }
+
+  Future<void> _loadThemeSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    _followSystem = prefs.getBool('follow_system_theme') ?? true;
+    _darkMode = prefs.getBool('dark_mode') ?? false;
+    _themeColor = Color(prefs.getInt('theme_color') ?? Colors.deepPurple.value);
+    notifyListeners();
+  }
+
+  Future<void> setThemeMode({bool? followSystem, bool? darkMode}) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (followSystem != null) {
+      _followSystem = followSystem;
+      await prefs.setBool('follow_system_theme', followSystem);
+    }
+    if (darkMode != null) {
+      _darkMode = darkMode;
+      await prefs.setBool('dark_mode', darkMode);
+    }
+    notifyListeners();
+  }
+
+  Future<void> setThemeColor(Color color) async {
+    final prefs = await SharedPreferences.getInstance();
+    _themeColor = color;
+    await prefs.setInt('theme_color', color.value);
+    notifyListeners();
+  }
+}
+
+// 截屏防护管理器
+class SecurityManager extends ChangeNotifier {
+  static final SecurityManager _instance = SecurityManager._internal();
+  factory SecurityManager() => _instance;
+
+  bool _preventScreenshot = true;  // 默认开启截屏防护
+  bool _enableBiometric = true;   // 默认开启指纹认证
+
+  bool get preventScreenshot => _preventScreenshot;
+  bool get enableBiometric => _enableBiometric;
+
+  SecurityManager._internal() {
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    _preventScreenshot = prefs.getBool('prevent_screenshot') ?? true;
+    _enableBiometric = prefs.getBool('enable_biometric') ?? true;
+    notifyListeners();
+  }
+
+  Future<void> setPreventScreenshot(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    _preventScreenshot = value;
+    await prefs.setBool('prevent_screenshot', value);
+    notifyListeners();
+  }
+
+  Future<void> setEnableBiometric(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    _enableBiometric = value;
+    await prefs.setBool('enable_biometric', value);
+    notifyListeners();
+  }
+}
 
 // 应用程序入口
 void main() {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final ThemeManager _themeManager = ThemeManager();
+
+  @override
+  void initState() {
+    super.initState();
+    _themeManager.addListener(_themeListener);
+    _initializeWindowManager();
+  }
+
+  Future<void> _initializeWindowManager() async {
+    if (Platform.isLinux || Platform.isWindows) {
+      await windowManager.ensureInitialized();
+      await windowManager.setPreventClose(true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _themeManager.removeListener(_themeListener);
+    super.dispose();
+  }
+
+  void _themeListener() {
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'PWD 管理器',
+      title: 'PWD Manager',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: _themeManager.themeColor,
+        ),
         useMaterial3: true,
       ),
-      home: const AuthenticationPage(title: "锁定")
-      // home: const AuthenticationPage(title: ""),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: _themeManager.themeColor,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      themeMode: _themeManager.followSystem 
+        ? ThemeMode.system 
+        : (_themeManager.darkMode ? ThemeMode.dark : ThemeMode.light),
+      home: const AuthenticationPage(title: 'PWD Manager'),
     );
   }
 }
@@ -38,13 +166,46 @@ class MainFrame extends StatefulWidget {
 }
 
 // MyHomePage 对应的状态类
-class MainFrameState extends State<MainFrame> with WidgetsBindingObserver  {
+class MainFrameState extends State<MainFrame> with WidgetsBindingObserver {
   int _selectedIndex = 0;
+  final SecurityManager _securityManager = SecurityManager();
+  bool _hasPassword = false;
 
   static const List<Widget> _widgetOptions = <Widget>[
     PasswordPage(title: "密码"),
     MyPage(title: "我的")
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _securityManager.addListener(_securityListener);
+    _updateSecuritySettings();
+    _checkPasswordStatus();
+  }
+
+  @override
+  void dispose() {
+    _securityManager.removeListener(_securityListener);
+    super.dispose();
+  }
+
+  void _securityListener() {
+    _updateSecuritySettings();
+  }
+
+  Future<void> _updateSecuritySettings() async {
+    if (Platform.isLinux || Platform.isWindows) {
+      await windowManager.setPreventClose(_securityManager.preventScreenshot);
+    }
+  }
+
+  Future<void> _checkPasswordStatus() async {
+    final hasPassword = await PasswordAuth.hasPassword();
+    setState(() {
+      _hasPassword = hasPassword;
+    });
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -63,15 +224,15 @@ class MainFrameState extends State<MainFrame> with WidgetsBindingObserver  {
         title: Text(widget.title, style: TextStyle(fontSize: 18),),
         centerTitle: true,
         actions: [
-          IconButton(
-      // search_outlined
-            icon: const Icon(Icons.lock, size: 22,),
-            onPressed: () {
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) {
-                return AuthenticationPage(title: "锁定");
-              }));
-            },
-          ),
+          if (_hasPassword)  // 只在设置了密码时显示锁头
+            IconButton(
+              icon: const Icon(Icons.lock, size: 22,),
+              onPressed: () {
+                Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) {
+                  return AuthenticationPage(title: "锁定");
+                }));
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.settings, size: 22,),
             onPressed: () {
@@ -80,9 +241,7 @@ class MainFrameState extends State<MainFrame> with WidgetsBindingObserver  {
               }));
             },
           ),
-          SizedBox(
-            width: 10,
-          )
+          const SizedBox(width: 10,)
         ],
       ),
       drawer: const Drawer(
