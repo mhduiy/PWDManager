@@ -4,11 +4,13 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:path_provider/path_provider.dart';
+ import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 import 'password_auth.dart';
 import 'databasehelper.dart';
 import 'main.dart';
 import 'backup_manager.dart';
+import 'package:flutter/rendering.dart';
 
 class MyPage extends StatefulWidget {
   const MyPage({super.key, required this.title});
@@ -68,6 +70,10 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
     Colors.red,
     Colors.pink,
   ];
+
+  // 在类的开头添加版本常量
+  static const String _version = '1.0.0';
+  static const String _buildNumber = '1';
 
   @override
   void initState() {
@@ -477,6 +483,155 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
     }
   }
 
+  Widget _buildAboutSection() {
+    return _buildSettingSection(
+      title: '关于',
+      subtitle: '项目信息',
+      icon: Icons.info_outline,
+      children: [
+        ListTile(
+          leading: const Icon(Icons.code),
+          title: const Text('项目地址'),
+          subtitle: const Text('https://github.com/mhduiy/PWDManager'),
+          onTap: () async {
+            HapticFeedback.mediumImpact();
+            final Uri url = Uri.parse('https://github.com/mhduiy/PWDManager');
+            if (await canLaunchUrl(url)) {
+              await launchUrl(url, mode: LaunchMode.externalApplication);
+            } else {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('无法打开链接')),
+                );
+              }
+            }
+          },
+        ),
+        ListTile(
+          leading: const Icon(Icons.person_outline),
+          title: const Text('开发者'),
+          subtitle: const Text('mhduiy'),
+        ),
+        ListTile(
+          leading: const Icon(Icons.info_outline),
+          title: const Text('版本信息'),
+          subtitle: Text('Version $_version (Build $_buildNumber)'),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            _showAboutAnimation();
+          },
+        ),
+      ],
+    );
+  }
+
+  void _showAboutAnimation() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Logo动画
+                TweenAnimationBuilder(
+                  duration: const Duration(milliseconds: 800),
+                  tween: Tween<double>(begin: 0, end: 1),
+                  builder: (context, double value, child) {
+                    return Transform.scale(
+                      scale: value,
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                        ),
+                        child: Icon(
+                          Icons.lock,
+                          size: 50,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 20),
+                // 应用名称
+                TweenAnimationBuilder(
+                  duration: const Duration(milliseconds: 800),
+                  tween: Tween<double>(begin: 0, end: 1),
+                  builder: (context, double value, child) {
+                    return Opacity(
+                      opacity: value,
+                      child: Transform.translate(
+                        offset: Offset(0, 20 * (1 - value)),
+                        child: const Text(
+                          'PWD Manager',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 10),
+                // 版本信息
+                TweenAnimationBuilder(
+                  duration: const Duration(milliseconds: 800),
+                  tween: Tween<double>(begin: 0, end: 1),
+                  builder: (context, double value, child) {
+                    return Opacity(
+                      opacity: value,
+                      child: Transform.translate(
+                        offset: Offset(0, 20 * (1 - value)),
+                        child: Text(
+                          'Version $_version (Build $_buildNumber)',
+                          style: TextStyle(
+                            color: Theme.of(context).textTheme.bodySmall?.color,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 20),
+                // 版权信息
+                TweenAnimationBuilder(
+                  duration: const Duration(milliseconds: 800),
+                  tween: Tween<double>(begin: 0, end: 1),
+                  builder: (context, double value, child) {
+                    return Opacity(
+                      opacity: value,
+                      child: Transform.translate(
+                        offset: Offset(0, 20 * (1 - value)),
+                        child: Text(
+                          '© ${DateTime.now().year} mhduiy',
+                          style: TextStyle(
+                            color: Theme.of(context).textTheme.bodySmall?.color,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -619,6 +774,8 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
               ),
           ],
         ),
+
+        _buildAboutSection(),
       ],
     );
   }

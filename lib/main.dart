@@ -170,6 +170,7 @@ class MainFrameState extends State<MainFrame> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   final SecurityManager _securityManager = SecurityManager();
   bool _hasPassword = false;
+  final GlobalKey _lockIconKey = GlobalKey();
 
   static const List<Widget> _widgetOptions = <Widget>[
     PasswordPage(title: "密码"),
@@ -226,11 +227,24 @@ class MainFrameState extends State<MainFrame> with WidgetsBindingObserver {
         actions: [
           if (_hasPassword)  // 只在设置了密码时显示锁头
             IconButton(
-              icon: const Icon(Icons.lock, size: 22,),
+              key: _lockIconKey,
+              padding: EdgeInsets.zero,
+              icon: const Icon(Icons.lock_open, size: 22,),
               onPressed: () {
-                Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) {
-                  return AuthenticationPage(title: "锁定");
-                }));
+                final RenderBox? renderBox = _lockIconKey.currentContext?.findRenderObject() as RenderBox?;
+                if (renderBox != null) {
+                  final Offset buttonPosition = renderBox.localToGlobal(Offset.zero);
+                  
+                  Navigator.pushReplacement(context, PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) => AuthenticationPage(
+                      title: "锁定",
+                      startPosition: buttonPosition,
+                      startSize: const Size(22, 22),
+                      startIcon: Icons.lock_open,
+                    ),
+                    transitionDuration: Duration.zero,
+                  ));
+                }
               },
             ),
           IconButton(

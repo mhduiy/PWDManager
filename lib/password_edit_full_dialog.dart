@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'password.dart';
 import 'databasehelper.dart';
+import 'utils/password_strength.dart';
 
 Future<void> _insertPassword(BuildContext context, String purpose, String account, String password, String note) async {
   Password newPassword = Password(purpose: purpose, account: account, password: password, note: note);
@@ -22,6 +23,12 @@ void showEditPasswordFullDialog(BuildContext context, {bool isEdit = false, int 
   TextEditingController passwordController = TextEditingController();
   TextEditingController noteController = TextEditingController();
 
+  // 用于监听密码变化
+  ValueNotifier<String> passwordNotifier = ValueNotifier<String>('');
+  passwordController.addListener(() {
+    passwordNotifier.value = passwordController.text;
+  });
+
   Password password = Password(purpose: "", account: "", password: "", note: "");
 
   if (isEdit) {
@@ -33,6 +40,7 @@ void showEditPasswordFullDialog(BuildContext context, {bool isEdit = false, int 
         accountController.text = password.account;
         passwordController.text = password.password;
         noteController.text = password.note;
+        passwordNotifier.value = password.password;
       }
     });
   }
@@ -81,7 +89,7 @@ void showEditPasswordFullDialog(BuildContext context, {bool isEdit = false, int 
                           },
                         ),
                         const SizedBox(width: 8),
-                        Text( isEdit ? '编辑密码' : '添加新密码'),
+                        Text(isEdit ? '编辑密码' : '添加新密码'),
                       ],
                     ),
                     actions: [
@@ -109,7 +117,7 @@ void showEditPasswordFullDialog(BuildContext context, {bool isEdit = false, int 
                             } else {
                               _insertPassword(context, purpose, account, password, note);
                             }
-                          } else {
+                          
                             // 强制刷新 UI 以显示错误信息
                             setState(() {});
                           }
@@ -153,6 +161,18 @@ void showEditPasswordFullDialog(BuildContext context, {bool isEdit = false, int 
                               border: const OutlineInputBorder(),
                               errorText: errorMessages[passwordController],
                             ),
+                          ),
+                          // 添加密码强度指示器
+                          ValueListenableBuilder<String>(
+                            valueListenable: passwordNotifier,
+                            builder: (context, password, child) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                child: PasswordStrengthIndicator(
+                                  password: password,
+                                ),
+                              );
+                            },
                           ),
                           const SizedBox(height: 10),
                           TextField(

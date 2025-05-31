@@ -173,4 +173,10 @@ class DatabaseHelper extends ChangeNotifier {
     await db.delete('passwords');
     notifyListeners(); // 通知监听者数据已更改
   }
+
+  Future<int> getPasswordCount() async {
+    Database db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM passwords');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
 }
