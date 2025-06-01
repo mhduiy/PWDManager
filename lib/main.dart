@@ -8,6 +8,7 @@ import 'my_page.dart';
 import 'password_edit_full_dialog.dart';
 import 'authentication_page.dart';
 import 'password_auth.dart';
+import 'databasehelper.dart';
 
 // 全局主题管理器
 class ThemeManager extends ChangeNotifier {
@@ -356,10 +357,9 @@ class MainFrameState extends State<MainFrame> with WidgetsBindingObserver {
           const SizedBox(width: 10,)
         ],
       ),
-      drawer: const Drawer(
-          child: Center(
-        child: Text("无事发生"),
-      )),
+      drawer: Drawer(
+        child: _buildDrawerContent(),
+      ),
       body: _widgetOptions.elementAt(_selectedIndex),
       floatingActionButton: SpeedDial(
         animatedIcon: AnimatedIcons.menu_close,
@@ -371,6 +371,361 @@ class MainFrameState extends State<MainFrame> with WidgetsBindingObserver {
           )
         ],
       ),
+    );
+  }
+
+  Widget _buildDrawerContent() {
+    return Column(
+      children: [
+        // 头部区域
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Theme.of(context).colorScheme.primary,
+                Theme.of(context).colorScheme.primary.withOpacity(0.8),
+              ],
+            ),
+          ),
+          child: SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  radius: 30,
+                  backgroundColor: Colors.white.withOpacity(0.2),
+                  child: Icon(
+                    Icons.lock,
+                    size: 32,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'PWD Manager',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '安全的密码管理',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        
+        // 统计信息卡片
+        Container(
+          margin: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.analytics_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '统计信息',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              FutureBuilder<Map<String, dynamic>>(
+                future: _getStatistics(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  
+                  final stats = snapshot.data!;
+                  return Column(
+                    children: [
+                      _buildStatItem('总密码数', '${stats['total']}', Icons.password),
+                      const SizedBox(height: 8),
+                      _buildStatItem('收藏密码', '${stats['favorites']}', Icons.star),
+                      const SizedBox(height: 8),
+                      _buildStatItem('今日新增', '${stats['todayAdded']}', Icons.add_circle_outline),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+        
+        // 导航菜单
+        Expanded(
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              _buildDrawerItem(
+                icon: Icons.dashboard_outlined,
+                title: '仪表盘',
+                onTap: () {
+                  Navigator.pop(context);
+                  // 可以添加仪表盘页面
+                },
+              ),
+              _buildDrawerItem(
+                icon: Icons.category_outlined,
+                title: '分类管理',
+                onTap: () {
+                  Navigator.pop(context);
+                  // 可以添加分类管理页面
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('分类管理功能开发中...')),
+                  );
+                },
+              ),
+              _buildDrawerItem(
+                icon: Icons.backup_outlined,
+                title: '备份管理',
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(context, MaterialPageRoute(
+                    builder: (context) => const MyPage(title: "备份设置"),
+                  ));
+                },
+              ),
+              _buildDrawerItem(
+                icon: Icons.security_outlined,
+                title: '安全设置',
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(context, MaterialPageRoute(
+                    builder: (context) => const MyPage(title: "安全设置"),
+                  ));
+                },
+              ),
+              const Divider(),
+              _buildDrawerItem(
+                icon: Icons.help_outline,
+                title: '帮助与支持',
+                onTap: () {
+                  Navigator.pop(context);
+                  _showHelpDialog();
+                },
+              ),
+              _buildDrawerItem(
+                icon: Icons.info_outline,
+                title: '关于应用',
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(context, MaterialPageRoute(
+                    builder: (context) => const MyPage(title: "关于"),
+                  ));
+                },
+              ),
+            ],
+          ),
+        ),
+        
+        // 底部快捷操作
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+              ),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    showEditPasswordFullDialog(context);
+                  },
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('添加密码'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, IconData icon) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 16,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const Spacer(),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon),
+      title: Text(title),
+      onTap: onTap,
+      dense: true,
+    );
+  }
+
+  Future<Map<String, dynamic>> _getStatistics() async {
+    final dbHelper = DatabaseHelper();
+    final passwords = await dbHelper.getPasswords();
+    final today = DateTime.now();
+    final todayStart = DateTime(today.year, today.month, today.day);
+    
+    int favorites = 0;
+    int todayAdded = 0;
+    
+    for (var password in passwords) {
+      // 统计收藏数量
+      if (password['is_favorite'] == 1) {
+        favorites++;
+      }
+      
+      // 统计今日新增
+      if (password['created_time'] != null) {
+        final createdTime = DateTime.parse(password['created_time']);
+        if (createdTime.isAfter(todayStart)) {
+          todayAdded++;
+        }
+      }
+    }
+    
+    return {
+      'total': passwords.length,
+      'favorites': favorites,
+      'todayAdded': todayAdded,
+    };
+  }
+
+  void _showHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(
+                Icons.help_outline,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              const Text('使用帮助'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildHelpItem('🔒', '安全提示', '请定期备份数据，使用强密码保护应用'),
+                const SizedBox(height: 12),
+                _buildHelpItem('📱', '快捷操作', '长按密码卡片快速删除，左右滑动查看更多操作'),
+                const SizedBox(height: 12),
+                _buildHelpItem('⭐', '收藏功能', '点击星号收藏常用密码，收藏的密码会优先显示'),
+                const SizedBox(height: 12),
+                _buildHelpItem('🔍', '搜索技巧', '支持按用途和账号搜索，快速找到目标密码'),
+                const SizedBox(height: 12),
+                _buildHelpItem('🎨', '个性化', '可在设置中自定义主题颜色和安全选项'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: const Text('知道了'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildHelpItem(String emoji, String title, String description) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 16)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                description,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).textTheme.bodySmall?.color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
