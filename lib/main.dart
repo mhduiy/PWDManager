@@ -244,15 +244,30 @@ class MainFrameState extends State<MainFrame> with WidgetsBindingObserver {
                 final RenderBox? renderBox = _lockIconKey.currentContext?.findRenderObject() as RenderBox?;
                 if (renderBox != null) {
                   final Offset buttonPosition = renderBox.localToGlobal(Offset.zero);
+                  final Size buttonSize = renderBox.size;
+                  
+                  // 计算图标在按钮中的居中位置
+                  const double iconSize = 22.0;
+                  final Offset iconPosition = Offset(
+                    buttonPosition.dx + (buttonSize.width - iconSize) / 2,
+                    buttonPosition.dy + (buttonSize.height - iconSize) / 2,
+                  );
                   
                   Navigator.pushReplacement(context, PageRouteBuilder(
                     pageBuilder: (context, animation, secondaryAnimation) => AuthenticationPage(
                       title: "锁定",
-                      startPosition: buttonPosition,
-                      startSize: const Size(22, 22),
+                      startPosition: iconPosition,
+                      startSize: const Size(iconSize, iconSize),
                       startIcon: Icons.lock_open,
                     ),
-                    transitionDuration: Duration.zero,
+                    transitionDuration: const Duration(milliseconds: 300),
+                    reverseTransitionDuration: const Duration(milliseconds: 300),
+                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: animation,
+                        child: child,
+                      );
+                    },
                   ));
                 }
               },

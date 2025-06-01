@@ -90,6 +90,10 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
   late AnimationController _bounceController;
   late Animation<double> _bounceAnimation;
 
+  // 添加页面淡入动画控制器
+  late AnimationController _pageOpacityController;
+  late Animation<double> _pageOpacityAnimation;
+
   @override
   void initState() {
     super.initState();
@@ -99,12 +103,30 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
     _breathingController = AnimationController(
       duration: _breathingAnimationDuration,
       vsync: this,
-    )..repeat(reverse: true);
+    );
     
     _breathingAnimation = CurvedAnimation(
       parent: _breathingController,
       curve: Curves.easeInOut,
     );
+
+    // 初始化页面淡入动画
+    _pageOpacityController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+
+    _pageOpacityAnimation = CurvedAnimation(
+      parent: _pageOpacityController,
+      curve: Curves.easeOut,
+    );
+
+    // 启动页面淡入动画，完成后启动背景呼吸动画
+    _pageOpacityController.forward().then((_) {
+      if (mounted) {
+        _breathingController.repeat(reverse: true);
+      }
+    });
 
     _shakeController = AnimationController(
       duration: const Duration(milliseconds: 700),
@@ -266,10 +288,11 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
     // 计算目标位置
     final targetPosition = _calculateLockPosition(context, 1.0);
 
-    // 计算起始位置
+    // 使用实际传递的按钮尺寸计算起始位置
+    final actualStartSize = widget.startSize ?? const Size(_startIconSize, _startIconSize);
     final startIconCenter = Offset(
-      widget.startPosition!.dx + _startIconSize / 2,
-      widget.startPosition!.dy + _startIconSize / 2,
+      widget.startPosition!.dx + actualStartSize.width / 2,
+      widget.startPosition!.dy + actualStartSize.height / 2,
     );
 
     final startPosition = Offset(
@@ -286,9 +309,9 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
       curve: Curves.easeInOutCubic,
     ));
 
-    // 创建大小动画
+    // 创建大小动画，使用实际按钮尺寸
     _lockSizeAnimation = Tween<double>(
-      begin: _startIconSize / _targetIconSize,
+      begin: actualStartSize.width / _targetIconSize,
       end: 1.0,
     ).animate(CurvedAnimation(
       parent: _lockPositionController,
@@ -325,6 +348,7 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
     _lockPositionController.dispose();
     _iconChangeController.dispose();
     _bounceController.dispose();  // 释放弹性动画控制器
+    _pageOpacityController.dispose();
     super.dispose();
   }
 
@@ -714,16 +738,8 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
       return const MainFrame(title: "PWD Manager");
     }
 
-    final size = MediaQuery.of(context).size;
     final primaryColor = Theme.of(context).colorScheme.primary;
     final secondaryColor = Theme.of(context).colorScheme.secondary;
-    
-    final softColors = [
-      primaryColor.withOpacity(0.25),
-      primaryColor.withBlue(255).withOpacity(0.22),
-      secondaryColor.withOpacity(0.2),
-      primaryColor.withOpacity(0.25),
-    ];
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -733,88 +749,97 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
         toolbarHeight: 0,
       ),
       body: AnimatedBuilder(
-        animation: _breathingAnimation,
+        animation: _pageOpacityAnimation,
         builder: (context, child) {
-          final progress = _breathingAnimation.value;
-          final wave1 = sin(progress * pi) * 0.25;
-          final wave2 = sin(progress * 1.5 * pi) * 0.2;
-          final wave3 = cos(progress * 0.8 * pi) * 0.2;
+          return Opacity(
+            opacity: _pageOpacityAnimation.value,
+            child: AnimatedBuilder(
+              animation: _breathingAnimation,
+              builder: (context, child) {
+                // 简化的颜色过渡动画
+                final progress = _breathingAnimation.value;
+                final color1 = Color.lerp(
+                  primaryColor.withOpacity(0.15),
+                  primaryColor.withOpacity(0.25),
+                  progress,
+                )!;
+                final color2 = Color.lerp(
+                  secondaryColor.withOpacity(0.1),
+                  secondaryColor.withOpacity(0.2),
+                  progress,
+                )!;
+                
+                return Stack(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          center: Alignment.center,
+                          radius: 1.5,
+                          colors: [
+                            color1,
+                            color2,
+                            primaryColor.withOpacity(0.05),
+                          ],
+                          stops: const [0.0, 0.6, 1.0],
+                        ),
+                      ),
+                    ),
+                    _buildLockIcon(),
+                    _buildContentLayout(),
+                  ],
+                );
+              },
+              child: _buildContentLayout(),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildContentLayout() {
+    return SafeArea(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // 计算键盘部分
+          final keypadHeight = _numberButtonSize * 4 + _numberButtonPadding * 6;
           
-          final mixedProgress = (wave1 + wave2 + wave3 + 1) / 2;
+          // 计算指示器部分
+          final dotsHeight = _dotSize + _dotSpacing * 2;
           
-          final centerX = sin(progress * 0.8 * pi) * 0.15 + cos(progress * 0.6 * pi) * 0.1;
-          final centerY = cos(progress * 0.7 * pi) * 0.15 + sin(progress * 0.5 * pi) * 0.1;
+          // 计算底部固定元素总高度
+          final fixedElementsHeight = keypadHeight + dotsHeight + _keypadBottomSpacing + _dotsToKeypadSpacing;
+          
+          // 计算锁头可用的顶部空间
+          final availableTopSpace = constraints.maxHeight - fixedElementsHeight - _lockToDotsSpacing;
+          
+          // 计算锁头位置
+          final lockPosition = _calculateLockPosition(context, availableTopSpace);
           
           return Stack(
             children: [
-              Container(
-                decoration: BoxDecoration(
-                  gradient: SweepGradient(
-                    center: Alignment(centerX, centerY),
-                    colors: [
-                      Color.lerp(softColors[0], softColors[1], mixedProgress)!,
-                      Color.lerp(softColors[1], softColors[2], mixedProgress)!,
-                      Color.lerp(softColors[2], softColors[3], mixedProgress)!,
-                    ],
-                    stops: const [0.3, 0.6, 1.0],
-                    transform: GradientRotation(mixedProgress * 2.5 * pi),
-                  ),
-                ),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(
-                    sigmaX: 40,
-                    sigmaY: 40,
-                  ),
-                  child: child,
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: _keypadBottomSpacing,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildPasswordDots(),
+                    SizedBox(height: _dotsToKeypadSpacing),
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: MediaQuery.of(context).size.width * 0.05,
+                      ),
+                      child: _buildKeypad(),
+                    ),
+                  ],
                 ),
               ),
-              _buildLockIcon(),
             ],
           );
         },
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              // 计算键盘部分
-              final keypadHeight = _numberButtonSize * 4 + _numberButtonPadding * 6;
-              
-              // 计算指示器部分
-              final dotsHeight = _dotSize + _dotSpacing * 2;
-              
-              // 计算底部固定元素总高度
-              final fixedElementsHeight = keypadHeight + dotsHeight + _keypadBottomSpacing + _dotsToKeypadSpacing;
-              
-              // 计算锁头可用的顶部空间
-              final availableTopSpace = constraints.maxHeight - fixedElementsHeight - _lockToDotsSpacing;
-              
-              // 计算锁头位置
-              final lockPosition = _calculateLockPosition(context, availableTopSpace);
-              
-              return Stack(
-                children: [
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: _keypadBottomSpacing,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildPasswordDots(),
-                        SizedBox(height: _dotsToKeypadSpacing),
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: size.width * 0.05,
-                          ),
-                          child: _buildKeypad(),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
       ),
     );
   }
