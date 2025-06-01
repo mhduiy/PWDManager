@@ -35,8 +35,9 @@ class DatabaseHelper extends ChangeNotifier {
     String path = join(await getDatabasesPath(), 'passwords.db');
     return await openDatabase(
       path,
-      version: 1,
+      version: 4,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
         await db.execute('PRAGMA encoding = "UTF-8"');
@@ -51,9 +52,29 @@ class DatabaseHelper extends ChangeNotifier {
         purpose TEXT,
         account TEXT,
         password TEXT,
-        note TEXT
+        note TEXT,
+        view_count INTEGER DEFAULT 0,
+        last_viewed_time TEXT,
+        created_time TEXT,
+        is_favorite INTEGER DEFAULT 0
       )
     ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE passwords ADD COLUMN view_count INTEGER DEFAULT 0');
+      await db.execute('ALTER TABLE passwords ADD COLUMN last_viewed_time TEXT');
+    }
+    if (oldVersion < 3) {
+      await db.execute('ALTER TABLE passwords ADD COLUMN created_time TEXT');
+      // 为现有记录设置默认创建时间
+      final now = DateTime.now().toIso8601String();
+      await db.execute('UPDATE passwords SET created_time = ? WHERE created_time IS NULL', [now]);
+    }
+    if (oldVersion < 4) {
+      await db.execute('ALTER TABLE passwords ADD COLUMN is_favorite INTEGER DEFAULT 0');
+    }
   }
 
   String doEncrypt(String data) {
@@ -93,6 +114,8 @@ class DatabaseHelper extends ChangeNotifier {
 
   Future<int> insertPassword(Map<String, dynamic> password) async {
     Database db = await database;
+    // 添加创建时间
+    password['created_time'] = DateTime.now().toIso8601String();
     // 加密所有敏感数据
     password['purpose'] = doEncrypt(password['purpose']);
     password['account'] = doEncrypt(password['account']);
@@ -117,6 +140,10 @@ class DatabaseHelper extends ChangeNotifier {
         'account': doDecrypt(password['account']),
         'password': doDecrypt(password['password']),
         'note': doDecrypt(password['note']),
+        'view_count': password['view_count'] ?? 0,
+        'last_viewed_time': password['last_viewed_time'],
+        'created_time': password['created_time'],
+        'is_favorite': password['is_favorite'] ?? 0,
       });
     }
 
@@ -145,6 +172,10 @@ class DatabaseHelper extends ChangeNotifier {
         'account': doDecrypt(result.first['account']),
         'password': doDecrypt(result.first['password']),
         'note': doDecrypt(result.first['note']),
+        'view_count': result.first['view_count'] ?? 0,
+        'last_viewed_time': result.first['last_viewed_time'],
+        'created_time': result.first['created_time'],
+        'is_favorite': result.first['is_favorite'] ?? 0,
       };
       return decryptedPassword;
     }
@@ -178,5 +209,36 @@ class DatabaseHelper extends ChangeNotifier {
     Database db = await database;
     final result = await db.rawQuery('SELECT COUNT(*) as count FROM passwords');
     return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  // 添加更新阅读统计的方法
+  Future<void> incrementViewCount(int id) async {
+    Database db = await database;
+    final now = DateTime.now().toIso8601String();
+    
+    await db.execute('''
+      UPDATE passwords 
+      SET view_count = COALESCE(view_count, 0) + 1, 
+          last_viewed_time = ? 
+      WHERE id = ?
+    ''', [now, id]);
+    
+    notifyListeners();
+  }
+
+  // 添加切换收藏状态的方法
+  Future<void> toggleFavorite(int id) async {
+    Database db = await database;
+    
+    await db.execute('''
+      UPDATE passwords 
+      SET is_favorite = CASE 
+        WHEN is_favorite = 1 THEN 0 
+        ELSE 1 
+      END 
+      WHERE id = ?
+    ''', [id]);
+    
+    notifyListeners();
   }
 }

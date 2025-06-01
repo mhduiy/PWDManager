@@ -2,6 +2,29 @@ import 'package:flutter/material.dart';
 import 'password.dart';
 import 'databasehelper.dart';
 import 'utils/password_strength.dart';
+import 'password_generator.dart';
+
+// 添加显示密码生成器的函数
+void _showPasswordGenerator(BuildContext context, TextEditingController passwordController, ValueNotifier<String> passwordNotifier) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (context) => Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: PasswordGenerator(
+        onPasswordGenerated: (generatedPassword) {
+          passwordController.text = generatedPassword;
+          passwordNotifier.value = generatedPassword;
+        },
+      ),
+    ),
+  );
+}
 
 Future<void> _insertPassword(BuildContext context, String purpose, String account, String password, String note) async {
   Password newPassword = Password(purpose: purpose, account: account, password: password, note: note);
@@ -160,6 +183,13 @@ void showEditPasswordFullDialog(BuildContext context, {bool isEdit = false, int 
                               labelText: '密码',
                               border: const OutlineInputBorder(),
                               errorText: errorMessages[passwordController],
+                              suffixIcon: IconButton(
+                                icon: const Icon(Icons.generating_tokens),
+                                onPressed: () {
+                                  _showPasswordGenerator(context, passwordController, passwordNotifier);
+                                },
+                                tooltip: '密码生成器',
+                              ),
                             ),
                           ),
                           // 添加密码强度指示器

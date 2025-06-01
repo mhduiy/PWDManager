@@ -29,27 +29,27 @@ class AuthenticationPage extends StatefulWidget {
 
 class _AuthenticationPageState extends State<AuthenticationPage> with TickerProviderStateMixin {
   // 动画相关常量
-  static const Duration _animationDuration = Duration(milliseconds: 600);
+  static const Duration _animationDuration = Duration(milliseconds: 800);
   static const Duration _breathingAnimationDuration = Duration(seconds: 25);
   
   // 布局相关常量
   static const double _containerSize = 100.0;
   static const double _startIconSize = 22.0;
-  static const double _targetIconSize = 45.0;
+  static const double _targetIconSize = 52.0;
   static const double _defaultOpacity = 0.7;
   static const double _maxOpacity = 0.85;
   
   // 布局比例常量
-  static const double _numberButtonSize = 85.0;
-  static const double _numberButtonPadding = 8.0;
-  static const double _dotSize = 16.0;
-  static const double _dotSpacing = 10.0;
-  static const double _maxKeypadWidth = 300.0;
+  static const double _numberButtonSize = 65.0;
+  static const double _numberButtonPadding = 2.0;
+  static const double _dotSize = 14.0;
+  static const double _dotSpacing = 8.0;
+  static const double _maxKeypadWidth = 240.0;
   
   // 间距常量
-  static const double _keypadBottomSpacing = 40.0;  // 键盘到底部的距离
-  static const double _dotsToKeypadSpacing = 50.0;  // 指示器到键盘的距离
-  static const double _lockToDotsSpacing = 60.0;    // 锁头到指示器的距离
+  static const double _keypadBottomSpacing = 30.0;
+  static const double _dotsToKeypadSpacing = 35.0;
+  static const double _lockToDotsSpacing = 45.0;
 
   // 动画权重常量
   static const double _initialAnimationWeight = 30.0;
@@ -85,6 +85,10 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
   // 初始化图标切换动画
   late AnimationController _iconChangeController;
   late Animation<double> _iconChangeAnimation;
+
+  // 添加弹性动画控制器
+  late AnimationController _bounceController;
+  late Animation<double> _bounceAnimation;
 
   @override
   void initState() {
@@ -150,6 +154,27 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
       curve: Curves.easeInOut,
     );
 
+    // 初始化弹性动画控制器
+    _bounceController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+
+    _bounceAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.15,
+    ).animate(CurvedAnimation(
+      parent: _bounceController,
+      curve: Curves.easeOutBack,
+    ));
+
+    // 动画完成后自动返回
+    _bounceController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _bounceController.reverse();
+      }
+    });
+
     // 初始化图标切换动画
     _iconChangeController = AnimationController(
       duration: _animationDuration,
@@ -163,6 +188,8 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
     )..addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         HapticFeedback.lightImpact();
+        // 触发弹性动画
+        _bounceController.forward();
       }
     });
 
@@ -188,28 +215,28 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
     // 为数字0-9创建动画控制器
     for (int i = 0; i <= 9; i++) {
       final controller = AnimationController(
-        duration: const Duration(milliseconds: 100),
+        duration: const Duration(milliseconds: 50),
         vsync: this,
       );
       _animationControllers[i.toString()] = controller;
-      _animations[i.toString()] = Tween<double>(begin: 1.0, end: 0.95).animate(
+      _animations[i.toString()] = Tween<double>(begin: 1.0, end: 0.98).animate(
         CurvedAnimation(
           parent: controller,
-          curve: Curves.easeInOut,
+          curve: Curves.linear,
         ),
       );
     }
     // 为删除和指纹按钮创建动画控制器
     for (String key in ['delete', 'fingerprint']) {
       final controller = AnimationController(
-        duration: const Duration(milliseconds: 100),
+        duration: const Duration(milliseconds: 50),
         vsync: this,
       );
       _animationControllers[key] = controller;
-      _animations[key] = Tween<double>(begin: 1.0, end: 0.95).animate(
+      _animations[key] = Tween<double>(begin: 1.0, end: 0.98).animate(
         CurvedAnimation(
           parent: controller,
-          curve: Curves.easeInOut,
+          curve: Curves.linear,
         ),
       );
     }
@@ -241,13 +268,12 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
 
     // 计算起始位置
     final startIconCenter = Offset(
-      widget.startPosition!.dx + _startIconSize / 2,  // 起始图标的中心点
+      widget.startPosition!.dx + _startIconSize / 2,
       widget.startPosition!.dy + _startIconSize / 2,
     );
 
-    // 计算起始位置（考虑容器大小）
     final startPosition = Offset(
-      startIconCenter.dx - _containerSize / 2,  // 使容器中心与图标中心对齐
+      startIconCenter.dx - _containerSize / 2,
       startIconCenter.dy - _containerSize / 2,
     );
 
@@ -257,44 +283,26 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
       end: targetPosition,
     ).animate(CurvedAnimation(
       parent: _lockPositionController,
-      curve: Curves.easeOutCubic,
+      curve: Curves.easeInOutCubic,
     ));
 
     // 创建大小动画
-    _lockSizeAnimation = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween<double>(
-          begin: _startIconSize / _targetIconSize,
-          end: (_startIconSize + 2) / _targetIconSize,
-        ).chain(CurveTween(curve: Curves.easeOut)),
-        weight: _initialAnimationWeight,
-      ),
-      TweenSequenceItem(
-        tween: Tween<double>(
-          begin: (_startIconSize + 2) / _targetIconSize,
-          end: 1.0,
-        ).chain(CurveTween(curve: Curves.easeOutCubic)),
-        weight: _finalAnimationWeight,
-      ),
-    ]).animate(_lockPositionController);
+    _lockSizeAnimation = Tween<double>(
+      begin: _startIconSize / _targetIconSize,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _lockPositionController,
+      curve: Curves.easeInOutCubic,
+    ));
 
     // 创建透明度动画
-    _lockOpacityAnimation = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween<double>(
-          begin: _defaultOpacity,
-          end: _maxOpacity,
-        ).chain(CurveTween(curve: Curves.easeOut)),
-        weight: _initialAnimationWeight,
-      ),
-      TweenSequenceItem(
-        tween: Tween<double>(
-          begin: _maxOpacity,
-          end: _defaultOpacity,
-        ).chain(CurveTween(curve: Curves.easeOutCubic)),
-        weight: _finalAnimationWeight,
-      ),
-    ]).animate(_lockPositionController);
+    _lockOpacityAnimation = Tween<double>(
+      begin: _defaultOpacity,
+      end: _defaultOpacity,  // 保持相同的透明度，减少视觉干扰
+    ).animate(CurvedAnimation(
+      parent: _lockPositionController,
+      curve: Curves.easeInOutCubic,
+    ));
 
     setState(() {
       _isLockAnimationInitialized = true;
@@ -316,6 +324,7 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
     _successController.dispose();
     _lockPositionController.dispose();
     _iconChangeController.dispose();
+    _bounceController.dispose();  // 释放弹性动画控制器
     super.dispose();
   }
 
@@ -351,6 +360,11 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
       _canCheckBiometrics = canCheckBiometrics;
       _availableBiometrics = availableBiometrics;
     });
+
+    // 认证状态检查完成后，检查是否需要自动触发生物认证
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAutoAuthentication();
+    });
   }
 
   Future<void> _authenticateWithBiometrics() async {
@@ -385,34 +399,27 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
       height: _numberButtonSize,
       child: Padding(
         padding: EdgeInsets.all(_numberButtonPadding),
-        child: GestureDetector(
-          onTapDown: (_) {
-            _animationControllers[number]?.forward();
-            HapticFeedback.lightImpact();
-          },
-          onTapUp: (_) {
-            _animationControllers[number]?.reverse();
-            setState(() {
-              _password += number;
-              _verifyPassword();
-            });
-          },
-          onTapCancel: () => _animationControllers[number]?.reverse(),
-          child: ScaleTransition(
-            scale: _animations[number] ?? _animations['0']!,
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-              ),
-              child: Center(
-                child: Text(
-                  number,
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w500,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+        child: Material(
+          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+          shape: const CircleBorder(),
+          clipBehavior: Clip.hardEdge,
+          child: InkWell(
+            onTapDown: (_) {
+              HapticFeedback.lightImpact();
+            },
+            onTap: () {
+              setState(() {
+                _password += number;
+                _verifyPassword();
+              });
+            },
+            child: Center(
+              child: Text(
+                number,
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w500,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
             ),
@@ -428,29 +435,20 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
       height: _numberButtonSize,
       child: Padding(
         padding: EdgeInsets.all(_numberButtonPadding),
-        child: GestureDetector(
-          onTapDown: (_) {
-            _animationControllers[animationKey]?.forward();
-            HapticFeedback.lightImpact();
-          },
-          onTapUp: (_) {
-            _animationControllers[animationKey]?.reverse();
-            onPressed();
-          },
-          onTapCancel: () => _animationControllers[animationKey]?.reverse(),
-          child: ScaleTransition(
-            scale: _animations[animationKey] ?? _animations['delete']!,
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-              ),
-              child: Center(
-                child: Icon(
-                  icon,
-                  size: 28,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
+        child: Material(
+          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+          shape: const CircleBorder(),
+          clipBehavior: Clip.hardEdge,
+          child: InkWell(
+            onTapDown: (_) {
+              HapticFeedback.lightImpact();
+            },
+            onTap: onPressed,
+            child: Center(
+              child: Icon(
+                icon,
+                size: 28,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
           ),
@@ -559,17 +557,17 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [1, 2, 3].map((i) => _buildNumberButton(i.toString())).toList(),
               ),
-              SizedBox(height: buttonSpacing),
+              SizedBox(height: buttonSpacing * 0.7),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [4, 5, 6].map((i) => _buildNumberButton(i.toString())).toList(),
               ),
-              SizedBox(height: buttonSpacing),
+              SizedBox(height: buttonSpacing * 0.7),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [7, 8, 9].map((i) => _buildNumberButton(i.toString())).toList(),
               ),
-              SizedBox(height: buttonSpacing),
+              SizedBox(height: buttonSpacing * 0.7),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -600,11 +598,19 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
     if (!_isLockAnimationInitialized) return const SizedBox.shrink();
 
     Widget buildIcon(IconData icon, double opacity) {
-      return Center(  // 确保图标在容器中居中
-        child: Icon(
-          icon,
-          size: _targetIconSize,
-          color: Theme.of(context).colorScheme.primary.withOpacity(opacity),
+      return Center(
+        child: AnimatedBuilder(
+          animation: _bounceAnimation,
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _bounceAnimation.value,
+              child: Icon(
+                icon,
+                size: _targetIconSize,
+                color: Theme.of(context).colorScheme.primary.withOpacity(opacity),
+              ),
+            );
+          },
         ),
       );
     }
@@ -683,6 +689,22 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
         HapticFeedback.heavyImpact();
         _shakeController.forward();
       }
+    }
+  }
+
+  void _checkAutoAuthentication() {
+    // 检查是否应该自动触发生物认证
+    if (!Platform.isLinux && 
+        _canCheckBiometrics && 
+        _availableBiometrics.isNotEmpty && 
+        _securityManager.enableBiometric && 
+        _securityManager.autoBiometric) {
+      // 延迟一小段时间后自动触发生物认证
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          _authenticateWithBiometrics();
+        }
+      });
     }
   }
 

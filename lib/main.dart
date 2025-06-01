@@ -62,9 +62,11 @@ class SecurityManager extends ChangeNotifier {
 
   bool _preventScreenshot = true;  // 默认开启截屏防护
   bool _enableBiometric = true;   // 默认开启指纹认证
+  bool _autoBiometric = false;    // 默认关闭自动生物认证
 
   bool get preventScreenshot => _preventScreenshot;
   bool get enableBiometric => _enableBiometric;
+  bool get autoBiometric => _autoBiometric;
 
   SecurityManager._internal() {
     _loadSettings();
@@ -74,6 +76,7 @@ class SecurityManager extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _preventScreenshot = prefs.getBool('prevent_screenshot') ?? true;
     _enableBiometric = prefs.getBool('enable_biometric') ?? true;
+    _autoBiometric = prefs.getBool('auto_biometric') ?? false;
     notifyListeners();
   }
 
@@ -88,6 +91,13 @@ class SecurityManager extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _enableBiometric = value;
     await prefs.setBool('enable_biometric', value);
+    notifyListeners();
+  }
+
+  Future<void> setAutoBiometric(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    _autoBiometric = value;
+    await prefs.setBool('auto_biometric', value);
     notifyListeners();
   }
 }

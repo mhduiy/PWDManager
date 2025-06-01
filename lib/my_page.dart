@@ -730,6 +730,19 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
                   },
                 ),
               ),
+            if (_canCheckBiometrics && _availableBiometrics.isNotEmpty && _hasPassword && _securityManager.enableBiometric)
+              ListTile(
+                leading: const Icon(Icons.auto_awesome),
+                title: const Text('自动生物认证'),
+                subtitle: const Text('进入认证界面时自动弹出生物认证'),
+                trailing: Switch(
+                  value: _securityManager.autoBiometric,
+                  onChanged: (bool value) {
+                    HapticFeedback.lightImpact();
+                    _securityManager.setAutoBiometric(value);
+                  },
+                ),
+              ),
             ListTile(
               leading: const Icon(Icons.no_photography),
               title: const Text('防止截屏'),
