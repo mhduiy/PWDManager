@@ -6,6 +6,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'password.dart';
 import 'databasehelper.dart';
+import 'utils/website_icons.dart';
 
 class PasswordPage extends StatefulWidget {
   const PasswordPage({super.key, required this.title});
@@ -565,13 +566,11 @@ ${password.note.isNotEmpty ? '\n备注：${password.note}' : ''}
                     Stack(
                       children: [
                         CircleAvatar(
-                          backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                          child: Text(
-                            password.purpose[0].toUpperCase(),
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          backgroundColor: WebsiteIcons.getIconColor(password.purpose, Theme.of(context).colorScheme).withOpacity(0.1),
+                          child: Icon(
+                            WebsiteIcons.getIcon(password.purpose),
+                            color: WebsiteIcons.getIconColor(password.purpose, Theme.of(context).colorScheme),
+                            size: 24,
                           ),
                         ),
                         // 收藏星标
