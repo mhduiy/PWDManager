@@ -57,12 +57,6 @@
 
 ## 📋 系统要求
 
-### 开发环境
-- Flutter SDK 3.4.3+
-- Dart SDK 3.4.3+
-- Android Studio / VS Code
-- Xcode (仅iOS/macOS开发)
-
 ### 运行环境
 - **Android**: API 24+ (Android 7.0+)
 - **iOS**: iOS 12.0+
@@ -70,79 +64,21 @@
 - **Windows**: Windows 10 1809+
 - **macOS**: macOS 10.14+
 
-## 🛠️ 安装指南
+## 🛠️ 快速开始
 
-### 开发环境搭建
+1. **下载安装包**
+   - 从 [Releases](https://github.com/yourusername/PWDManager/releases) 页面下载对应平台的安装包
+   - 或者通过应用商店搜索"PWD Manager"
 
-1. **安装Flutter**
-   ```bash
-   # 下载Flutter SDK
-   git clone https://github.com/flutter/flutter.git -b stable
-   
-   # 添加到PATH环境变量
-   export PATH="$PATH:`pwd`/flutter/bin"
-   
-   # 验证安装
-   flutter doctor
-   ```
+2. **首次设置**
+   - 设置6位数字主密码
+   - 可选择启用生物认证（指纹/面容ID）
+   - 根据提示完成初始配置
 
-2. **克隆项目**
-   ```bash
-   git clone https://github.com/yourusername/PWDManager.git
-   cd PWDManager
-   ```
-
-3. **安装依赖**
-   ```bash
-   flutter pub get
-   ```
-
-4. **运行应用**
-   ```bash
-   # 开发模式
-   flutter run
-   
-   # 调试模式
-   flutter run --debug
-   
-   # 发布模式
-   flutter run --release
-   ```
-
-### 平台特定配置
-
-#### Android
-```bash
-# 构建APK
-flutter build apk
-
-# 构建AAB
-flutter build appbundle
-```
-
-#### iOS
-```bash
-# 构建iOS应用
-flutter build ios
-```
-
-#### Linux
-```bash
-# 构建Linux应用
-flutter build linux
-```
-
-#### Windows
-```bash
-# 构建Windows应用
-flutter build windows
-```
-
-#### macOS
-```bash
-# 构建macOS应用
-flutter build macos
-```
+3. **开始使用**
+   - 点击右下角添加按钮创建第一个密码
+   - 使用搜索和分类功能管理密码
+   - 在设置中调整安全选项和主题
 
 ## 📦 核心依赖
 
@@ -156,25 +92,6 @@ flutter build macos
 | qr_flutter | ^4.1.0 | 二维码生成 |
 | share_plus | ^7.2.1 | 系统分享 |
 | window_manager | ^0.5.0 | 桌面端窗口管理 |
-
-## 🏗️ 项目结构
-
-```
-lib/
-├── main.dart                    # 应用入口
-├── password.dart               # 密码数据模型
-├── databasehelper.dart         # 数据库操作
-├── password_page.dart          # 密码列表页面
-├── my_page.dart               # 设置页面
-├── authentication_page.dart    # 认证页面
-├── password_auth.dart          # 认证逻辑
-├── password_generator.dart     # 密码生成器
-├── password_edit_full_dialog.dart # 密码编辑对话框
-└── utils/
-    ├── password_strength.dart   # 密码强度检测
-    ├── password_category.dart   # 分类管理
-    └── website_icons.dart      # 网站图标
-```
 
 ## 🎯 功能详解
 
@@ -218,10 +135,6 @@ lib/
 - **主题色彩**：多种预设颜色可选
 - **Material 3**：最新设计语言支持
 
-## 📸 应用截图
-
-> 注：建议添加应用的实际截图展示各个功能界面
-
 ## 🔒 安全说明
 
 ### 数据加密
@@ -241,23 +154,6 @@ lib/
 4. 避免在不安全环境使用
 5. 定期更新应用版本
 
-## 🤝 贡献指南
-
-欢迎参与项目开发！
-
-### 开发流程
-1. Fork 项目
-2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送分支 (`git push origin feature/AmazingFeature`)
-5. 创建 Pull Request
-
-### 代码规范
-- 遵循 Dart/Flutter 官方代码规范
-- 使用 `flutter analyze` 检查代码质量
-- 添加必要的注释和文档
-- 确保新功能有对应的测试
-
 ## 📝 更新日志
 
 ### v1.0.0 (2024-12-19)
@@ -273,27 +169,9 @@ lib/
 
 本项目采用 [MIT License](LICENSE) 开源协议。
 
-## 💬 反馈与支持
-
-如果您在使用过程中遇到问题或有改进建议，请通过以下方式联系我们：
-
-- 📧 Email: your.email@example.com
-- 🐛 Issues: [GitHub Issues](https://github.com/yourusername/PWDManager/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/yourusername/PWDManager/discussions)
-
 ## ⭐ 致谢
 
 感谢所有开源项目的贡献者，特别是：
 - [Flutter Team](https://flutter.dev) - 跨平台UI框架
 - [Material Design](https://material.io) - 设计规范
 - 所有依赖包的维护者
-
----
-
-<div align="center">
-
-**如果这个项目对您有帮助，请给个 ⭐ Star 支持一下！**
-
-Made with ❤️ by [Your Name]
-
-</div>

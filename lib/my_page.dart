@@ -4,8 +4,9 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:path_provider/path_provider.dart';
- import 'package:url_launcher/url_launcher.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
+import 'dart:math';
 import 'password_auth.dart';
 import 'databasehelper.dart';
 import 'main.dart';
@@ -59,7 +60,7 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
   late AnimationController _controller;
   late Animation<double> _animation;
 
-  // 预设的主题颜色
+  // 预设的主题颜色 - 增加更多选项
   final List<Color> _presetColors = [
     Colors.deepPurple,
     Colors.blue,
@@ -69,6 +70,14 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
     Colors.orange,
     Colors.red,
     Colors.pink,
+    Colors.purple,
+    Colors.cyan,
+    Colors.lightGreen,
+    Colors.amber,
+    Colors.deepOrange,
+    Colors.brown,
+    Colors.blueGrey,
+    Colors.lime,
   ];
 
   // 在类的开头添加版本常量
@@ -304,32 +313,44 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
     required IconData icon,
     required List<Widget> children,
   }) {
-    return FadeTransition(
-      opacity: _animation,
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 0.1),
-          end: Offset.zero,
-        ).animate(_animation),
-        child: Card(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          elevation: 1,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ListTile(
-                leading: Icon(
-                  icon,
-                  color: Theme.of(context).colorScheme.primary,
-                  size: 28,
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      child: Card(
+        elevation: 2,
+        shadowColor: Theme.of(context).colorScheme.shadow.withOpacity(0.1),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Theme.of(context).colorScheme.primary.withOpacity(0.05),
+                    Theme.of(context).colorScheme.primary.withOpacity(0.02),
+                  ],
+                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 24,
+                  ),
                 ),
                 title: Text(
                   title,
                   style: const TextStyle(
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                     fontSize: 16,
                   ),
                 ),
@@ -337,43 +358,305 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
                   subtitle,
                   style: TextStyle(
                     color: Theme.of(context).textTheme.bodySmall?.color,
+                    fontSize: 13,
                   ),
                 ),
               ),
-              const Divider(height: 1),
-              ...children,
-            ],
-          ),
+            ),
+            const Divider(height: 1, thickness: 0.5),
+            ...children,
+            const SizedBox(height: 8),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildColorCircle(Color color, bool isSelected) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        _themeManager.setThemeColor(color);
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: isSelected ? 44 : 40,
-        height: isSelected ? 44 : 40,
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
-            width: 2,
+  Widget _buildEnhancedListTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    Widget? trailing,
+    VoidCallback? onTap,
+    Color? iconColor,
+    bool isDestructive = false,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.transparent,
+      ),
+      child: ListTile(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        leading: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: (iconColor ?? Theme.of(context).colorScheme.primary)
+                .withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(isSelected ? 0.4 : 0.3),
-              blurRadius: isSelected ? 8 : 4,
-              offset: const Offset(0, 2),
+          child: Icon(
+            icon,
+            color: isDestructive 
+                ? Theme.of(context).colorScheme.error
+                : (iconColor ?? Theme.of(context).colorScheme.primary),
+            size: 20,
+          ),
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 15,
+            color: isDestructive 
+                ? Theme.of(context).colorScheme.error
+                : null,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: 13,
+            color: Theme.of(context).textTheme.bodySmall?.color,
+          ),
+        ),
+        trailing: trailing,
+        onTap: onTap,
+      ),
+    );
+  }
+
+  Widget _buildDangerousActionTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.error.withOpacity(0.3),
+          width: 1,
+        ),
+        color: Theme.of(context).colorScheme.error.withOpacity(0.05),
+      ),
+      child: ListTile(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        leading: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.error.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: Theme.of(context).colorScheme.error,
+            size: 20,
+          ),
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 15,
+            color: Theme.of(context).colorScheme.error,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: 13,
+            color: Theme.of(context).textTheme.bodySmall?.color,
+          ),
+        ),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          size: 16,
+          color: Theme.of(context).colorScheme.error.withOpacity(0.7),
+        ),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  Widget _buildEnhancedSlider({
+    required double value,
+    required double min,
+    required double max,
+    required int divisions,
+    required ValueChanged<double> onChanged,
+    required String Function(double) labelFormatter,
+  }) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text(
+            labelFormatter(value),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.primary,
             ),
-          ],
+          ),
+        ),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            activeTrackColor: Theme.of(context).colorScheme.primary,
+            inactiveTrackColor: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+            thumbColor: Theme.of(context).colorScheme.primary,
+            overlayColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 12),
+            overlayShape: const RoundSliderOverlayShape(overlayRadius: 20),
+            trackHeight: 6,
+          ),
+          child: Slider(
+            value: value,
+            min: min,
+            max: max,
+            divisions: divisions,
+            onChanged: onChanged,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                labelFormatter(min),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).textTheme.bodySmall?.color,
+                ),
+              ),
+              Text(
+                labelFormatter(max),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).textTheme.bodySmall?.color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 重新设计的简洁颜色选择器
+  Widget _buildColorSelector() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      _themeManager.themeColor.withOpacity(0.2),
+                      _themeManager.themeColor.withOpacity(0.1),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.palette,
+                  color: _themeManager.themeColor,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '主题颜色',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).textTheme.titleMedium?.color,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // 增加每行显示数量的颜色选择网格
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: MediaQuery.of(context).size.width > 400 ? 8 : 6,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 1,
+            ),
+            itemCount: _presetColors.length,
+            itemBuilder: (context, index) {
+              final color = _presetColors[index];
+              final isSelected = color.value == _themeManager.themeColor.value;
+              return _buildSimpleColorOption(color, isSelected);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 纯粹的颜色圆圈组件
+  Widget _buildSimpleColorOption(Color color, bool isSelected) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        splashColor: color.withOpacity(0.3),
+        highlightColor: color.withOpacity(0.1),
+        onTap: () {
+          HapticFeedback.mediumImpact();
+          _themeManager.setThemeColor(color);
+        },
+        child: Container(
+          padding: const EdgeInsets.all(2),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutBack,
+            width: isSelected ? 32 : 28,
+            height: isSelected ? 32 : 28,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isSelected 
+                    ? Colors.white
+                    : Colors.transparent,
+                width: isSelected ? 2 : 0,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(isSelected ? 0.4 : 0.2),
+                  blurRadius: isSelected ? 8 : 3,
+                  offset: Offset(0, isSelected ? 2 : 1),
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
+            child: isSelected
+                ? Icon(
+                    Icons.check,
+                    color: Colors.white,
+                    size: 16,
+                  )
+                : null,
+          ),
         ),
       ),
     );
@@ -489,10 +772,10 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
       subtitle: '项目信息',
       icon: Icons.info_outline,
       children: [
-        ListTile(
-          leading: const Icon(Icons.code),
-          title: const Text('项目地址'),
-          subtitle: const Text('https://github.com/mhduiy/PWDManager'),
+        _buildEnhancedListTile(
+          icon: Icons.code,
+          title: '项目地址',
+          subtitle: 'https://github.com/mhduiy/PWDManager',
           onTap: () async {
             HapticFeedback.mediumImpact();
             final Uri url = Uri.parse('https://github.com/mhduiy/PWDManager');
@@ -507,15 +790,15 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
             }
           },
         ),
-        ListTile(
-          leading: const Icon(Icons.person_outline),
-          title: const Text('开发者'),
-          subtitle: const Text('mhduiy'),
+        _buildEnhancedListTile(
+          icon: Icons.person_outline,
+          title: '开发者',
+          subtitle: 'mhduiy',
         ),
-        ListTile(
-          leading: const Icon(Icons.info_outline),
-          title: const Text('版本信息'),
-          subtitle: Text('Version $_version (Build $_buildNumber)'),
+        _buildEnhancedListTile(
+          icon: Icons.info_outline,
+          title: '版本信息',
+          subtitle: 'Version $_version (Build $_buildNumber)',
           onTap: () {
             HapticFeedback.lightImpact();
             _showAboutAnimation();
@@ -642,26 +925,23 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
           subtitle: '自定义应用的外观',
           icon: Icons.palette,
           children: [
-            ListTile(
-              leading: const Icon(Icons.brightness_auto),
-              title: const Text('跟随系统主题'),
+            _buildEnhancedListTile(
+              icon: Icons.brightness_auto,
+              title: '跟随系统主题',
+              subtitle: '自动切换深色和浅色主题',
               trailing: Switch(
                 value: _themeManager.followSystem,
                 onChanged: (bool value) {
                   HapticFeedback.lightImpact();
-                  _themeManager.setThemeMode(
-                    followSystem: value,
-                    darkMode: value 
-                      ? MediaQuery.of(context).platformBrightness == Brightness.dark
-                      : _themeManager.darkMode,
-                  );
+                  _themeManager.setThemeMode(followSystem: value);
                 },
               ),
             ),
             if (!_themeManager.followSystem)
-              ListTile(
-                leading: const Icon(Icons.dark_mode),
-                title: const Text('暗黑主题'),
+              _buildEnhancedListTile(
+                icon: Icons.dark_mode,
+                title: '深色模式',
+                subtitle: '使用深色主题界面',
                 trailing: Switch(
                   value: _themeManager.darkMode,
                   onChanged: (bool value) {
@@ -670,40 +950,29 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
                   },
                 ),
               ),
-            ListTile(
-              title: const Text('主题颜色'),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              subtitle: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                child: Row(
-                  children: _presetColors.map((color) => 
-                    _buildColorCircle(color, color == _themeManager.themeColor)
-                  ).toList(),
-                ),
-              ),
-            ),
+            // 主题颜色选择器
+            _buildColorSelector(),
           ],
         ),
 
         _buildSettingSection(
-          title: '备份',
-          subtitle: '导出或导入您的密码数据',
+          title: '数据',
+          subtitle: '备份和恢复您的数据',
           icon: Icons.backup,
           children: [
-            ListTile(
-              leading: const Icon(Icons.file_download),
-              title: const Text('导出数据'),
-              subtitle: const Text('将密码数据导出为加密文件'),
+            _buildEnhancedListTile(
+              icon: Icons.file_download,
+              title: '导出数据',
+              subtitle: '将密码数据导出为加密文件',
               onTap: () {
                 HapticFeedback.mediumImpact();
                 _exportData();
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.file_upload),
-              title: const Text('导入数据'),
-              subtitle: const Text('从加密文件导入密码数据'),
+            _buildEnhancedListTile(
+              icon: Icons.file_upload,
+              title: '导入数据',
+              subtitle: '从加密文件导入密码数据',
               onTap: () {
                 HapticFeedback.mediumImpact();
                 _importData();
@@ -718,10 +987,10 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
           icon: Icons.security,
           children: [
             if (_canCheckBiometrics && _availableBiometrics.isNotEmpty && _hasPassword)
-              ListTile(
-                leading: const Icon(Icons.fingerprint),
-                title: const Text('指纹解锁'),
-                subtitle: const Text('使用指纹快速解锁应用'),
+              _buildEnhancedListTile(
+                icon: Icons.fingerprint,
+                title: '指纹解锁',
+                subtitle: '使用指纹快速解锁应用',
                 trailing: Switch(
                   value: _securityManager.enableBiometric,
                   onChanged: (bool value) {
@@ -731,10 +1000,10 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
                 ),
               ),
             if (_canCheckBiometrics && _availableBiometrics.isNotEmpty && _hasPassword && _securityManager.enableBiometric)
-              ListTile(
-                leading: const Icon(Icons.auto_awesome),
-                title: const Text('自动生物认证'),
-                subtitle: const Text('进入认证界面时自动弹出生物认证'),
+              _buildEnhancedListTile(
+                icon: Icons.auto_awesome,
+                title: '自动生物认证',
+                subtitle: '进入认证界面时自动弹出生物认证',
                 trailing: Switch(
                   value: _securityManager.autoBiometric,
                   onChanged: (bool value) {
@@ -743,10 +1012,10 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
                   },
                 ),
               ),
-            ListTile(
-              leading: const Icon(Icons.no_photography),
-              title: const Text('防止截屏'),
-              subtitle: const Text('在显示敏感信息时禁用截屏'),
+            _buildEnhancedListTile(
+              icon: Icons.no_photography,
+              title: '防止截屏',
+              subtitle: '在显示敏感信息时禁用截屏',
               trailing: Switch(
                 value: _securityManager.preventScreenshot,
                 onChanged: (bool value) {
@@ -755,63 +1024,45 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
                 },
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.lock),
-              title: Text(_hasPassword ? '修改密码' : '设置密码'),
+            _buildEnhancedListTile(
+              icon: Icons.lock,
+              title: _hasPassword ? '修改密码' : '设置密码',
               subtitle: _hasPassword 
-                ? const Text('修改应用解锁密码')
-                : const Text('请设置密码以保护您的数据安全', style: TextStyle(color: Colors.red)),
+                ? '修改应用解锁密码'
+                : '请设置密码以保护您的数据安全',
               onTap: () {
                 HapticFeedback.mediumImpact();
                 _showChangePasswordDialog();
               },
+              iconColor: _hasPassword ? null : Colors.orange,
             ),
             if (_hasPassword)
-              ListTile(
-                leading: const Icon(Icons.no_encryption),
-                title: const Text('清除密码'),
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  _showClearPasswordDialog();
-                },
-              ),
-            if (_hasPassword)
-              ListTile(
-                leading: const Icon(Icons.restore),
-                title: const Text('重置密码'),
-                subtitle: const Text('忘记密码时使用，将清除所有数据'),
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  _showResetPasswordDialog();
-                },
-              ),
-            if (_hasPassword)
-              ListTile(
-                leading: const Icon(Icons.timer),
-                title: const Text('锁定超时'),
+              _buildEnhancedListTile(
+                icon: Icons.timer,
+                title: '锁定超时',
                 subtitle: Text(_securityManager.lockDurationSeconds == 0 
                     ? '已关闭' 
-                    : '错误尝试过多时的锁定时间：${_securityManager.lockDurationSeconds}秒'),
+                    : '错误尝试过多时的锁定时间：${_securityManager.lockDurationSeconds}秒').data!,
                 onTap: () {
                   HapticFeedback.mediumImpact();
                   _showLockDurationDialog();
                 },
               ),
             if (_hasPassword)
-              ListTile(
-                leading: const Icon(Icons.security),
-                title: const Text('最大尝试次数'),
-                subtitle: Text('超过此次数将锁定应用：${_securityManager.maxAttempts}次'),
+              _buildEnhancedListTile(
+                icon: Icons.security,
+                title: '最大尝试次数',
+                subtitle: '超过此次数将锁定应用：${_securityManager.maxAttempts}次',
                 onTap: () {
                   HapticFeedback.mediumImpact();
                   _showMaxAttemptsDialog();
                 },
               ),
             if (_hasPassword && Platform.isAndroid)
-              ListTile(
-                leading: const Icon(Icons.exit_to_app),
-                title: const Text('后台自动锁定'),
-                subtitle: const Text('应用进入后台时自动锁定'),
+              _buildEnhancedListTile(
+                icon: Icons.exit_to_app,
+                title: '后台自动锁定',
+                subtitle: '应用进入后台时自动锁定',
                 trailing: Switch(
                   value: _securityManager.autoLockOnBackground,
                   onChanged: (bool value) {
@@ -819,6 +1070,27 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
                     _securityManager.setAutoLockOnBackground(value);
                   },
                 ),
+              ),
+            // 危险操作放在最后
+            if (_hasPassword)
+              _buildDangerousActionTile(
+                icon: Icons.no_encryption,
+                title: '清除密码',
+                subtitle: '移除应用密码保护',
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  _showClearPasswordDialog();
+                },
+              ),
+            if (_hasPassword)
+              _buildDangerousActionTile(
+                icon: Icons.restore,
+                title: '重置密码',
+                subtitle: '忘记密码时使用，将清除所有数据',
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  _showResetPasswordDialog();
+                },
               ),
           ],
         ),
@@ -925,58 +1197,28 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
             return AlertDialog(
               title: const Text('设置锁定超时'),
               content: SizedBox(
-                width: 300, // 设置固定宽度
+                width: 300,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      selectedDurationSeconds == 0 
-                          ? '锁定功能已关闭' 
-                          : '锁定时间：${selectedDurationSeconds.round()}秒',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: selectedDurationSeconds == 0 
-                            ? Theme.of(context).colorScheme.error
-                            : Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Slider(
+                    _buildEnhancedSlider(
                       value: selectedDurationSeconds,
                       min: 0,
                       max: 600,
-                      divisions: 24, // 每25秒一个刻度
-                      label: selectedDurationSeconds == 0 
-                          ? '关闭' 
-                          : '${selectedDurationSeconds.round()}秒',
+                      divisions: 24,
                       onChanged: (value) {
                         setState(() {
                           selectedDurationSeconds = value;
                         });
                       },
+                      labelFormatter: (value) {
+                        if (value == 0) {
+                          return '锁定功能已关闭';
+                        } else {
+                          return '${value.round()}秒';
+                        }
+                      },
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '关闭',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                        ),
-                        Text(
-                          '600秒',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                        ),
-                      ],
-                    ),
-                    // 始终显示提示信息，避免宽度变化
                     Container(
                       margin: const EdgeInsets.only(top: 16),
                       padding: const EdgeInsets.all(12),
@@ -1025,13 +1267,12 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
                 TextButton(
                   child: const Text('确认'),
                   onPressed: () {
-                    // 将秒转换为分钟存储（向上取整）
                     int durationSeconds = selectedDurationSeconds == 0 
                         ? 0 
                         : selectedDurationSeconds.round();
                     _securityManager.setLockDurationSeconds(durationSeconds);
                     Navigator.of(context).pop();
-                    setState(() {}); // 刷新主页面
+                    setState(() {});
                   },
                 ),
               ],
@@ -1054,51 +1295,17 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
               title: const Text('设置最大尝试次数'),
               content: SizedBox(
                 width: 300,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '最大尝试次数：${selectedAttempts.round()}次',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Slider(
-                      value: selectedAttempts,
-                      min: 3,
-                      max: 10,
-                      divisions: 7,
-                      label: '${selectedAttempts.round()}次',
-                      onChanged: (value) {
-                        setState(() {
-                          selectedAttempts = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '3次',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                        ),
-                        Text(
-                          '10次',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                child: _buildEnhancedSlider(
+                  value: selectedAttempts,
+                  min: 3,
+                  max: 10,
+                  divisions: 7,
+                  onChanged: (value) {
+                    setState(() {
+                      selectedAttempts = value;
+                    });
+                  },
+                  labelFormatter: (value) => '${value.round()}次',
                 ),
               ),
               actions: <Widget>[

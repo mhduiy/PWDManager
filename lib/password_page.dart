@@ -553,6 +553,10 @@ ${password.note.isNotEmpty ? '\n备注：${password.note}' : ''}
   }
 
   Widget _buildPasswordCard(Password password) {
+    // 检查是否是最近访问的密码（24小时内）
+    final isRecentlyViewed = password.lastViewedTime != null &&
+        DateTime.now().difference(password.lastViewedTime!).inHours < 24;
+    
     return Slidable(
       key: ValueKey(password.id),
       startActionPane: ActionPane(
@@ -603,12 +607,25 @@ ${password.note.isNotEmpty ? '\n备注：${password.note}' : ''}
       ),
       child: Card(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        elevation: 1,
+        elevation: password.isFavorite ? 3 : (isRecentlyViewed ? 2 : 1),
+        shadowColor: password.isFavorite 
+            ? Colors.amber.withOpacity(0.3)
+            : (isRecentlyViewed 
+                ? Theme.of(context).colorScheme.primary.withOpacity(0.2)
+                : null),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: password.isFavorite
+                ? Colors.amber.withOpacity(0.3)
+                : (isRecentlyViewed
+                    ? Theme.of(context).colorScheme.primary.withOpacity(0.2)
+                    : Colors.transparent),
+            width: password.isFavorite ? 1.5 : (isRecentlyViewed ? 1 : 0),
+          ),
         ),
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           onTap: () async {
             setState(() {
               if (_expandedItems.contains(password.id)) {
@@ -633,132 +650,191 @@ ${password.note.isNotEmpty ? '\n备注：${password.note}' : ''}
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeInOut,
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: password.isFavorite
+                  ? LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.amber.withOpacity(0.05),
+                        Colors.orange.withOpacity(0.02),
+                      ],
+                    )
+                  : (isRecentlyViewed
+                      ? LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Theme.of(context).colorScheme.primary.withOpacity(0.03),
+                            Theme.of(context).colorScheme.primary.withOpacity(0.01),
+                          ],
+                        )
+                      : null),
+            ),
             child: Column(
               children: [
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Stack(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: WebsiteIcons.getIconColor(password.purpose, Theme.of(context).colorScheme).withOpacity(0.1),
-                          child: Icon(
-                            WebsiteIcons.getIcon(password.purpose),
-                            color: WebsiteIcons.getIconColor(password.purpose, Theme.of(context).colorScheme),
-                            size: 24,
+                    // 网站图标 - 保持左侧
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: WebsiteIcons.getIconColor(password.purpose, Theme.of(context).colorScheme).withOpacity(0.2),
+                            blurRadius: 8,
+                            spreadRadius: 0,
+                            offset: const Offset(0, 2),
                           ),
-                        ),
-                        // 收藏星标
-                        if (password.isFavorite)
-                          Positioned(
-                            right: -2,
-                            top: -2,
+                        ],
+                      ),
+                      child: Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 24,
+                            backgroundColor: WebsiteIcons.getIconColor(password.purpose, Theme.of(context).colorScheme).withOpacity(0.15),
                             child: Icon(
-                              Icons.star,
-                              color: Colors.amber,
-                              size: 16,
+                              WebsiteIcons.getIcon(password.purpose),
+                              color: WebsiteIcons.getIconColor(password.purpose, Theme.of(context).colorScheme),
+                              size: 26,
                             ),
                           ),
-                      ],
+                          // 收藏星标
+                          if (password.isFavorite)
+                            Positioned(
+                              right: -2,
+                              top: -2,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.1),
+                                      blurRadius: 2,
+                                      spreadRadius: 0,
+                                    ),
+                                  ],
+                                ),
+                                padding: const EdgeInsets.all(2),
+                                child: Icon(
+                                  Icons.star,
+                                  color: Colors.amber,
+                                  size: 14,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                     const SizedBox(width: 16),
+                    
+                    // 主要信息区域
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
+                          // 第一行：用途 + 密码强度
                           Row(
                             children: [
                               Expanded(
                                 child: Text(
                                   password.purpose,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w600,
+                                    color: password.isFavorite 
+                                        ? Colors.amber.shade800
+                                        : Theme.of(context).textTheme.titleMedium?.color,
                                   ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
+                              const SizedBox(width: 8),
+                              // 密码强度指示器 - 移到用途右侧
+                              _buildPasswordStrengthIndicator(password.password),
                             ],
-                            crossAxisAlignment: CrossAxisAlignment.center,
                           ),
-                          Text(
-                            password.account,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Theme.of(context).textTheme.bodySmall?.color,
-                            ),
+                          const SizedBox(height: 4),
+                          // 第二行：账号 + 状态标签
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  password.account,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Theme.of(context).textTheme.bodySmall?.color,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              // 状态标签组
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // 最近访问标签
+                                  if (isRecentlyViewed)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        '最近',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Theme.of(context).colorScheme.primary,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                    // 收藏按钮
-                    GestureDetector(
-                      onTap: () => _toggleFavorite(password),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                        child: Icon(
-                          password.isFavorite ? Icons.star : Icons.star_border,
-                          color: password.isFavorite ? Colors.amber : Colors.grey,
-                          size: 20,
+                    
+                    // 右侧操作区域
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // 展开按钮
+                        IconButton(
+                          icon: Icon(
+                            _expandedItems.contains(password.id) 
+                                ? Icons.keyboard_arrow_up 
+                                : Icons.keyboard_arrow_down,
+                            color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                          ),
+                          onPressed: () async {
+                            setState(() {
+                              if (_expandedItems.contains(password.id)) {
+                                _expandedItems.remove(password.id);
+                              } else {
+                                _expandedItems.add(password.id!);
+                              }
+                            });
+                            HapticFeedback.lightImpact();
+                            
+                            // 如果是展开操作，则更新阅读统计
+                            if (_expandedItems.contains(password.id)) {
+                              DatabaseHelper dbHelper = DatabaseHelper();
+                              await dbHelper.incrementViewCount(password.id!);
+                              // 重新加载数据以更新显示
+                              await _loadPasswords();
+                            }
+                          },
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // 将阅读统计信息移到右侧
-                    if (password.viewCount > 0) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.visibility,
-                              size: 12,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${password.viewCount}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                    IconButton(
-                      icon: Icon(
-                        _expandedItems.contains(password.id) 
-                            ? Icons.keyboard_arrow_up 
-                            : Icons.keyboard_arrow_down
-                      ),
-                      onPressed: () async {
-                        setState(() {
-                          if (_expandedItems.contains(password.id)) {
-                            _expandedItems.remove(password.id);
-                          } else {
-                            _expandedItems.add(password.id!);
-                          }
-                        });
-                        HapticFeedback.lightImpact();
-                        
-                        // 如果是展开操作，则更新阅读统计
-                        if (_expandedItems.contains(password.id)) {
-                          DatabaseHelper dbHelper = DatabaseHelper();
-                          await dbHelper.incrementViewCount(password.id!);
-                          // 重新加载数据以更新显示
-                          await _loadPasswords();
-                        }
-                      },
+                      ],
                     ),
                   ],
                 ),
@@ -999,5 +1075,61 @@ ${password.note.isNotEmpty ? '\n备注：${password.note}' : ''}
     } else {
       return '${lastViewed.year}/${lastViewed.month}/${lastViewed.day}';
     }
+  }
+
+  Widget _buildPasswordStrengthIndicator(String password) {
+    final strength = _getPasswordStrength(password);
+    final strengthColors = [
+      Colors.red,       // 弱
+      Colors.orange,    // 中等
+      Colors.green,     // 强
+    ];
+    final strengthLabels = ['弱', '中', '强'];
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 密码强度圆点
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: strengthColors[strength],
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            strengthLabels[strength],
+            style: TextStyle(
+              fontSize: 10,
+              color: strengthColors[strength],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  int _getPasswordStrength(String password) {
+    int score = 0;
+    
+    // 长度评分
+    if (password.length >= 8) score++;
+    if (password.length >= 12) score++;
+    
+    // 复杂性评分
+    if (RegExp(r'[a-z]').hasMatch(password)) score++;
+    if (RegExp(r'[A-Z]').hasMatch(password)) score++;
+    if (RegExp(r'[0-9]').hasMatch(password)) score++;
+    if (RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password)) score++;
+    
+    // 返回强度等级 (0: 弱, 1: 中等, 2: 强)
+    if (score <= 2) return 0;  // 弱
+    if (score <= 4) return 1;  // 中等
+    return 2;                  // 强
   }
 }
