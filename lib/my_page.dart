@@ -807,6 +807,19 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
                   _showMaxAttemptsDialog();
                 },
               ),
+            if (_hasPassword && Platform.isAndroid)
+              ListTile(
+                leading: const Icon(Icons.exit_to_app),
+                title: const Text('后台自动锁定'),
+                subtitle: const Text('应用进入后台时自动锁定'),
+                trailing: Switch(
+                  value: _securityManager.autoLockOnBackground,
+                  onChanged: (bool value) {
+                    HapticFeedback.lightImpact();
+                    _securityManager.setAutoLockOnBackground(value);
+                  },
+                ),
+              ),
           ],
         ),
 

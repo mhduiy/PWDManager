@@ -65,6 +65,7 @@ class SecurityManager extends ChangeNotifier {
   bool _autoBiometric = false;    // 默认关闭自动生物认证
   int _lockDurationSeconds = 300; // 默认锁定时间300秒(5分钟)
   int _maxAttempts = 5;           // 默认最大尝试次数5次
+  bool _autoLockOnBackground = true; // 默认开启后台自动锁定
 
   bool get preventScreenshot => _preventScreenshot;
   bool get enableBiometric => _enableBiometric;
@@ -72,6 +73,7 @@ class SecurityManager extends ChangeNotifier {
   int get lockDurationSeconds => _lockDurationSeconds;
   int get lockDurationMinutes => (_lockDurationSeconds / 60).ceil(); // 向上取整转换为分钟，保持兼容性
   int get maxAttempts => _maxAttempts;
+  bool get autoLockOnBackground => _autoLockOnBackground;
 
   SecurityManager._internal() {
     _loadSettings();
@@ -82,6 +84,7 @@ class SecurityManager extends ChangeNotifier {
     _preventScreenshot = prefs.getBool('prevent_screenshot') ?? true;
     _enableBiometric = prefs.getBool('enable_biometric') ?? true;
     _autoBiometric = prefs.getBool('auto_biometric') ?? false;
+    _autoLockOnBackground = prefs.getBool('auto_lock_on_background') ?? true;
     
     // 检查是否有新的秒级设置，如果没有则从分钟级设置迁移
     if (prefs.containsKey('lock_duration_seconds')) {
@@ -114,6 +117,13 @@ class SecurityManager extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _autoBiometric = value;
     await prefs.setBool('auto_biometric', value);
+    notifyListeners();
+  }
+
+  Future<void> setAutoLockOnBackground(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    _autoLockOnBackground = value;
+    await prefs.setBool('auto_lock_on_background', value);
     notifyListeners();
   }
 
@@ -226,6 +236,7 @@ class MainFrameState extends State<MainFrame> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _securityManager.addListener(_securityListener);
     _updateSecuritySettings();
     _checkPasswordStatus();
@@ -233,8 +244,34 @@ class MainFrameState extends State<MainFrame> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _securityManager.removeListener(_securityListener);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    // 当应用进入后台且开启了后台自动锁定时，跳转到锁定页面
+    if (state == AppLifecycleState.paused && 
+        _hasPassword && 
+        _securityManager.autoLockOnBackground &&
+        Platform.isAndroid) {
+      
+      // 延迟一帧执行，确保当前页面更新完成
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.pushReplacement(context, PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => const AuthenticationPage(
+              title: "应用已锁定",
+            ),
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+          ));
+        }
+      });
+    }
   }
 
   void _securityListener() {
