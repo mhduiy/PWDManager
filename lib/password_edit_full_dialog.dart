@@ -3,6 +3,7 @@ import 'password.dart';
 import 'databasehelper.dart';
 import 'utils/password_strength.dart';
 import 'password_generator.dart';
+import 'utils/password_category.dart';
 
 // 添加显示密码生成器的函数
 void _showPasswordGenerator(BuildContext context, TextEditingController passwordController, ValueNotifier<String> passwordNotifier) {
@@ -26,15 +27,27 @@ void _showPasswordGenerator(BuildContext context, TextEditingController password
   );
 }
 
-Future<void> _insertPassword(BuildContext context, String purpose, String account, String password, String note) async {
-  Password newPassword = Password(purpose: purpose, account: account, password: password, note: note);
+Future<void> _insertPassword(BuildContext context, String purpose, String account, String password, String note, String category) async {
+  Password newPassword = Password(
+    purpose: purpose, 
+    account: account, 
+    password: password, 
+    note: note,
+    category: category,
+  );
   DatabaseHelper dbHelper = DatabaseHelper();
   await dbHelper.insertPassword(newPassword.toMap());
   Navigator.of(context).pop(); // 关闭对话框
 }
 
-Future<void> _editPassword(BuildContext context, String purpose, String account, String password, String note, int id) async {
-  Password newPassword = Password(purpose: purpose, account: account, password: password, note: note);
+Future<void> _editPassword(BuildContext context, String purpose, String account, String password, String note, String category, int id) async {
+  Password newPassword = Password(
+    purpose: purpose, 
+    account: account, 
+    password: password, 
+    note: note,
+    category: category,
+  );
   DatabaseHelper dbHelper = DatabaseHelper();
   await dbHelper.updatePassword(id, newPassword.toMap());
   Navigator.of(context).pop(); // 关闭对话框
@@ -45,11 +58,21 @@ void showEditPasswordFullDialog(BuildContext context, {bool isEdit = false, int 
   TextEditingController accountController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
   TextEditingController noteController = TextEditingController();
+  
+  // 分类选择
+  String selectedCategory = 'other';
 
   // 用于监听密码变化
   ValueNotifier<String> passwordNotifier = ValueNotifier<String>('');
   passwordController.addListener(() {
     passwordNotifier.value = passwordController.text;
+  });
+  
+  // 用于监听用途变化，智能推荐分类
+  purposeController.addListener(() {
+    if (!isEdit && purposeController.text.isNotEmpty) {
+      selectedCategory = CategoryManager.suggestCategory(purposeController.text);
+    }
   });
 
   Password password = Password(purpose: "", account: "", password: "", note: "");
@@ -63,6 +86,7 @@ void showEditPasswordFullDialog(BuildContext context, {bool isEdit = false, int 
         accountController.text = password.account;
         passwordController.text = password.password;
         noteController.text = password.note;
+        selectedCategory = password.category;
         passwordNotifier.value = password.password;
       }
     });
@@ -136,9 +160,9 @@ void showEditPasswordFullDialog(BuildContext context, {bool isEdit = false, int 
                             String password = passwordController.text;
                             String note = noteController.text;
                             if (isEdit) {
-                              _editPassword(context, purpose, account, password, note, id);
+                              _editPassword(context, purpose, account, password, note, selectedCategory, id);
                             } else {
-                              _insertPassword(context, purpose, account, password, note);
+                              _insertPassword(context, purpose, account, password, note, selectedCategory);
                             }
                           
                             // 强制刷新 UI 以显示错误信息
@@ -166,8 +190,91 @@ void showEditPasswordFullDialog(BuildContext context, {bool isEdit = false, int 
                               border: const OutlineInputBorder(),
                               errorText: errorMessages[purposeController],
                             ),
+                            onChanged: (value) {
+                              if (!isEdit && value.isNotEmpty) {
+                                setState(() {
+                                  selectedCategory = CategoryManager.suggestCategory(value);
+                                });
+                              }
+                            },
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 16),
+                          
+                          // 分类选择
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Theme.of(context).colorScheme.outline),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '分类',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: CategoryManager.getSelectableCategories().map((category) {
+                                    final isSelected = selectedCategory == category.id;
+                                    return GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          selectedCategory = category.id;
+                                        });
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: isSelected 
+                                              ? category.color.withOpacity(0.2)
+                                              : Colors.transparent,
+                                          border: Border.all(
+                                            color: isSelected 
+                                                ? category.color
+                                                : Theme.of(context).colorScheme.outline.withOpacity(0.5),
+                                          ),
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              category.icon,
+                                              size: 16,
+                                              color: isSelected 
+                                                  ? category.color
+                                                  : Theme.of(context).colorScheme.onSurfaceVariant,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              category.name,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: isSelected 
+                                                    ? category.color
+                                                    : Theme.of(context).colorScheme.onSurfaceVariant,
+                                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ],
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 16),
                           TextField(
                             controller: accountController,
                             decoration: InputDecoration(

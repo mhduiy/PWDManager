@@ -35,7 +35,7 @@ class DatabaseHelper extends ChangeNotifier {
     String path = join(await getDatabasesPath(), 'passwords.db');
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
       onConfigure: (db) async {
@@ -56,7 +56,8 @@ class DatabaseHelper extends ChangeNotifier {
         view_count INTEGER DEFAULT 0,
         last_viewed_time TEXT,
         created_time TEXT,
-        is_favorite INTEGER DEFAULT 0
+        is_favorite INTEGER DEFAULT 0,
+        category TEXT DEFAULT 'other'
       )
     ''');
   }
@@ -74,6 +75,9 @@ class DatabaseHelper extends ChangeNotifier {
     }
     if (oldVersion < 4) {
       await db.execute('ALTER TABLE passwords ADD COLUMN is_favorite INTEGER DEFAULT 0');
+    }
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE passwords ADD COLUMN category TEXT DEFAULT \'other\'');
     }
   }
 
@@ -144,6 +148,7 @@ class DatabaseHelper extends ChangeNotifier {
         'last_viewed_time': password['last_viewed_time'],
         'created_time': password['created_time'],
         'is_favorite': password['is_favorite'] ?? 0,
+        'category': password['category'] ?? 'other',
       });
     }
 
@@ -176,6 +181,7 @@ class DatabaseHelper extends ChangeNotifier {
         'last_viewed_time': result.first['last_viewed_time'],
         'created_time': result.first['created_time'],
         'is_favorite': result.first['is_favorite'] ?? 0,
+        'category': result.first['category'] ?? 'other',
       };
       return decryptedPassword;
     }

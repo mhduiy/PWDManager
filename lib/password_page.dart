@@ -7,6 +7,7 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import 'password.dart';
 import 'databasehelper.dart';
 import 'utils/website_icons.dart';
+import 'utils/password_category.dart';
 
 class PasswordPage extends StatefulWidget {
   const PasswordPage({super.key, required this.title});
@@ -29,6 +30,9 @@ class PasswordPageState extends State<PasswordPage> {
 
   // 添加展开项的集合
   final Set<int> _expandedItems = {};
+  
+  // 添加分类筛选
+  String _selectedCategory = 'all';
 
   @override
   void initState() {
@@ -118,16 +122,28 @@ class PasswordPageState extends State<PasswordPage> {
   void _filterPasswords(String query) {
     if (!mounted) return;
     setState(() {
-      if (query.isEmpty) {
+      if (query.isEmpty && _selectedCategory == 'all') {
         _filteredPasswords = List.from(passwords);
       } else {
         _filteredPasswords = passwords.where((password) {
-          return password.purpose.toLowerCase().contains(query.toLowerCase()) ||
-                 password.account.toLowerCase().contains(query.toLowerCase());
+          bool matchesSearch = query.isEmpty ||
+              password.purpose.toLowerCase().contains(query.toLowerCase()) ||
+              password.account.toLowerCase().contains(query.toLowerCase());
+          
+          bool matchesCategory = _selectedCategory == 'all' || password.category == _selectedCategory;
+          
+          return matchesSearch && matchesCategory;
         }).toList();
       }
       _sortPasswords(); // 在过滤后进行排序
     });
+  }
+
+  void _filterByCategory(String categoryId) {
+    setState(() {
+      _selectedCategory = categoryId;
+    });
+    _filterPasswords(_searchController.text);
   }
 
   Future<void> _deletePassword(int id) async {
@@ -327,6 +343,66 @@ ${password.note.isNotEmpty ? '\n备注：${password.note}' : ''}
               textInputAction: TextInputAction.search,
             ),
           ),
+          
+          // 分类筛选栏
+          Container(
+            height: 60,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              itemCount: CategoryManager.getAllCategories().length,
+              itemBuilder: (context, index) {
+                final category = CategoryManager.getAllCategories()[index];
+                final isSelected = _selectedCategory == category.id;
+                
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: GestureDetector(
+                    onTap: () => _filterByCategory(category.id),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected 
+                            ? category.color.withOpacity(0.2)
+                            : Colors.transparent,
+                        border: Border.all(
+                          color: isSelected 
+                              ? category.color
+                              : Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            category.icon,
+                            size: 18,
+                            color: isSelected 
+                                ? category.color
+                                : Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            category.name,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isSelected 
+                                  ? category.color
+                                  : Theme.of(context).colorScheme.onSurfaceVariant,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Row(

@@ -9,6 +9,7 @@ import 'password_edit_full_dialog.dart';
 import 'authentication_page.dart';
 import 'password_auth.dart';
 import 'databasehelper.dart';
+import 'utils/password_category.dart';
 
 // 全局主题管理器
 class ThemeManager extends ChangeNotifier {
@@ -467,6 +468,8 @@ class MainFrameState extends State<MainFrame> with WidgetsBindingObserver {
                   }
                   
                   final stats = snapshot.data!;
+                  final categoryStats = stats['categoryStats'] as Map<String, int>;
+                  
                   return Column(
                     children: [
                       _buildStatItem('总密码数', '${stats['total']}', Icons.password),
@@ -474,6 +477,78 @@ class MainFrameState extends State<MainFrame> with WidgetsBindingObserver {
                       _buildStatItem('收藏密码', '${stats['favorites']}', Icons.star),
                       const SizedBox(height: 8),
                       _buildStatItem('今日新增', '${stats['todayAdded']}', Icons.add_circle_outline),
+                      
+                      // 添加分类统计
+                      if (categoryStats.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.category,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '分类统计',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ...categoryStats.entries
+                            .where((entry) => entry.value > 0)
+                            .take(5) // 只显示前5个分类
+                            .map((entry) {
+                          final category = CategoryManager.getCategoryById(entry.key);
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  category.icon,
+                                  size: 14,
+                                  color: category.color,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  category.name,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  '${entry.value}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: category.color,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        
+                        // 如果有更多分类，显示省略号
+                        if (categoryStats.entries.where((e) => e.value > 0).length > 5)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              '...',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                      ],
                     ],
                   );
                 },
@@ -631,6 +706,7 @@ class MainFrameState extends State<MainFrame> with WidgetsBindingObserver {
     
     int favorites = 0;
     int todayAdded = 0;
+    Map<String, int> categoryStats = {};
     
     for (var password in passwords) {
       // 统计收藏数量
@@ -645,12 +721,17 @@ class MainFrameState extends State<MainFrame> with WidgetsBindingObserver {
           todayAdded++;
         }
       }
+      
+      // 统计分类数量
+      final category = password['category'] ?? 'other';
+      categoryStats[category] = (categoryStats[category] ?? 0) + 1;
     }
     
     return {
       'total': passwords.length,
       'favorites': favorites,
       'todayAdded': todayAdded,
+      'categoryStats': categoryStats,
     };
   }
 

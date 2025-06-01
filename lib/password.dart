@@ -8,6 +8,7 @@ class Password {
   final DateTime? lastViewedTime;
   final DateTime? createdTime;
   final bool isFavorite;
+  final String category;
 
   Password({
     this.id,
@@ -19,6 +20,7 @@ class Password {
     this.lastViewedTime,
     this.createdTime,
     this.isFavorite = false,
+    this.category = 'other',
   });
 
   Map<String, dynamic> toMap() {
@@ -31,6 +33,7 @@ class Password {
       'last_viewed_time': lastViewedTime?.toIso8601String(),
       'created_time': createdTime?.toIso8601String(),
       'is_favorite': isFavorite ? 1 : 0,
+      'category': category,
     };
   }
 
@@ -49,6 +52,7 @@ class Password {
           ? DateTime.tryParse(map['created_time']) 
           : null,
       isFavorite: (map['is_favorite'] ?? 0) == 1,
+      category: map['category'] ?? 'other',
     );
   }
 }
