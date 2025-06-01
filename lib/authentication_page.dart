@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'dart:math';
 import 'dart:ui';
+import 'dart:async';
 import 'main.dart';
 import 'password_auth.dart';
 import 'databasehelper.dart';
@@ -93,6 +94,13 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
   // 添加页面淡入动画控制器
   late AnimationController _pageOpacityController;
   late Animation<double> _pageOpacityAnimation;
+
+  // 新增：锁定相关状态变量
+  bool _isLocked = false;
+  int _remainingLockTime = 0;
+  Timer? _lockTimer;
+  int _failedAttempts = 0;
+  int _remainingAttempts = 5;
 
   @override
   void initState() {
@@ -231,6 +239,9 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
         _isLockAnimationInitialized = true;
       });
     }
+    
+    // 新增：检查初始锁定状态
+    _checkLockStatus();
   }
 
   void _initializeAnimations() {
@@ -337,6 +348,7 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
 
   @override
   void dispose() {
+    _lockTimer?.cancel(); // 新增：清理锁定定时器
     _breathingController.dispose();
     _securityManager.removeListener(_securityListener);
     _shakeController.dispose();
@@ -418,20 +430,24 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
   }
 
   Widget _buildNumberButton(String number) {
+    final isDisabled = _isLocked;
+    
     return SizedBox(
       width: _numberButtonSize,
       height: _numberButtonSize,
       child: Padding(
         padding: EdgeInsets.all(_numberButtonPadding),
         child: Material(
-          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+          color: isDisabled 
+              ? Theme.of(context).colorScheme.primary.withOpacity(0.05)
+              : Theme.of(context).colorScheme.primary.withOpacity(0.1),
           shape: const CircleBorder(),
           clipBehavior: Clip.hardEdge,
           child: InkWell(
-            onTapDown: (_) {
+            onTapDown: isDisabled ? null : (_) {
               HapticFeedback.lightImpact();
             },
-            onTap: () {
+            onTap: isDisabled ? null : () {
               setState(() {
                 _password += number;
                 _verifyPassword();
@@ -443,7 +459,9 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w500,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: isDisabled
+                      ? Theme.of(context).colorScheme.primary.withOpacity(0.3)
+                      : Theme.of(context).colorScheme.primary,
                 ),
               ),
             ),
@@ -454,25 +472,31 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
   }
 
   Widget _buildActionButton(IconData icon, VoidCallback onPressed, String animationKey) {
+    final isDisabled = _isLocked;
+    
     return SizedBox(
       width: _numberButtonSize,
       height: _numberButtonSize,
       child: Padding(
         padding: EdgeInsets.all(_numberButtonPadding),
         child: Material(
-          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+          color: isDisabled 
+              ? Theme.of(context).colorScheme.primary.withOpacity(0.05)
+              : Theme.of(context).colorScheme.primary.withOpacity(0.1),
           shape: const CircleBorder(),
           clipBehavior: Clip.hardEdge,
           child: InkWell(
-            onTapDown: (_) {
+            onTapDown: isDisabled ? null : (_) {
               HapticFeedback.lightImpact();
             },
-            onTap: onPressed,
+            onTap: isDisabled ? null : onPressed,
             child: Center(
               child: Icon(
                 icon,
                 size: 28,
-                color: Theme.of(context).colorScheme.primary,
+                color: isDisabled
+                    ? Theme.of(context).colorScheme.primary.withOpacity(0.3)
+                    : Theme.of(context).colorScheme.primary,
               ),
             ),
           ),
@@ -692,6 +716,10 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
   }
 
   void _verifyPassword() async {
+    if (_isLocked) {
+      return; // 如果已锁定，直接返回
+    }
+    
     if (_password.length == 6) {
       final bool isValid = await PasswordAuth.verifyPassword(_password);
       if (isValid) {
@@ -712,8 +740,60 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
         });
         HapticFeedback.heavyImpact();
         _shakeController.forward();
+        
+        // 新增：检查是否被锁定
+        await _checkLockStatus();
       }
     }
+  }
+
+  // 新增：检查锁定状态
+  Future<void> _checkLockStatus() async {
+    final isLocked = await PasswordAuth.isLocked();
+    final failedAttempts = await PasswordAuth.getFailedAttempts();
+    final remainingAttempts = await PasswordAuth.getRemainingAttempts();
+    final lockDuration = await PasswordAuth.lockDurationMinutes;
+    
+    if (isLocked) {
+      final remainingTime = await PasswordAuth.getRemainingLockTime();
+      setState(() {
+        _isLocked = true;
+        _remainingLockTime = remainingTime;
+        _failedAttempts = failedAttempts;
+        _remainingAttempts = 0;
+      });
+      _startLockTimer();
+    } else {
+      setState(() {
+        _isLocked = false;
+        _remainingLockTime = 0;
+        _failedAttempts = failedAttempts;
+        _remainingAttempts = lockDuration == 0 ? -1 : remainingAttempts; // -1表示锁定功能关闭
+      });
+    }
+  }
+
+  // 新增：启动锁定倒计时定时器
+  void _startLockTimer() {
+    _lockTimer?.cancel();
+    _lockTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      final remainingTime = await PasswordAuth.getRemainingLockTime();
+      if (remainingTime <= 0) {
+        timer.cancel();
+        await _checkLockStatus(); // 重新检查状态
+      } else {
+        setState(() {
+          _remainingLockTime = remainingTime;
+        });
+      }
+    });
+  }
+
+  // 新增：格式化倒计时显示
+  String _formatLockTime(int seconds) {
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
   void _checkAutoAuthentication() {
@@ -808,8 +888,11 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
           // 计算指示器部分
           final dotsHeight = _dotSize + _dotSpacing * 2;
           
+          // 计算状态提示部分高度
+          final statusHeight = _isLocked || _failedAttempts > 0 ? 60.0 : 20.0;
+          
           // 计算底部固定元素总高度
-          final fixedElementsHeight = keypadHeight + dotsHeight + _keypadBottomSpacing + _dotsToKeypadSpacing;
+          final fixedElementsHeight = keypadHeight + dotsHeight + statusHeight + _keypadBottomSpacing + _dotsToKeypadSpacing;
           
           // 计算锁头可用的顶部空间
           final availableTopSpace = constraints.maxHeight - fixedElementsHeight - _lockToDotsSpacing;
@@ -827,7 +910,9 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildPasswordDots(),
-                    SizedBox(height: _dotsToKeypadSpacing),
+                    SizedBox(height: 16),
+                    _buildStatusText(), // 新增：状态提示
+                    SizedBox(height: _dotsToKeypadSpacing - 16),
                     Padding(
                       padding: EdgeInsets.symmetric(
                         horizontal: MediaQuery.of(context).size.width * 0.05,
@@ -842,5 +927,72 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
         },
       ),
     );
+  }
+
+  // 新增：构建状态提示文本
+  Widget _buildStatusText() {
+    if (_isLocked) {
+      return Container(
+        height: 60,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          children: [
+            Text(
+              '输入错误次数过多',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              '请等待 ${_formatLockTime(_remainingLockTime)} 后重试',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (_failedAttempts > 0) {
+      if (_remainingAttempts == -1) {
+        // 锁定功能关闭时的提示
+        return Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            '密码错误，请重新输入',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.tertiary,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        );
+      } else {
+        // 正常锁定功能开启时的提示
+        return Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            '密码错误，还可以尝试 ${_remainingAttempts} 次',
+            style: TextStyle(
+              color: _remainingAttempts <= 2 
+                  ? Theme.of(context).colorScheme.error
+                  : Theme.of(context).colorScheme.tertiary,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        );
+      }
+    }
+    
+    return SizedBox(height: 20); // 占位空间
   }
 }

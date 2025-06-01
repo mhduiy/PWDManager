@@ -63,10 +63,15 @@ class SecurityManager extends ChangeNotifier {
   bool _preventScreenshot = true;  // 默认开启截屏防护
   bool _enableBiometric = true;   // 默认开启指纹认证
   bool _autoBiometric = false;    // 默认关闭自动生物认证
+  int _lockDurationSeconds = 300; // 默认锁定时间300秒(5分钟)
+  int _maxAttempts = 5;           // 默认最大尝试次数5次
 
   bool get preventScreenshot => _preventScreenshot;
   bool get enableBiometric => _enableBiometric;
   bool get autoBiometric => _autoBiometric;
+  int get lockDurationSeconds => _lockDurationSeconds;
+  int get lockDurationMinutes => (_lockDurationSeconds / 60).ceil(); // 向上取整转换为分钟，保持兼容性
+  int get maxAttempts => _maxAttempts;
 
   SecurityManager._internal() {
     _loadSettings();
@@ -77,6 +82,17 @@ class SecurityManager extends ChangeNotifier {
     _preventScreenshot = prefs.getBool('prevent_screenshot') ?? true;
     _enableBiometric = prefs.getBool('enable_biometric') ?? true;
     _autoBiometric = prefs.getBool('auto_biometric') ?? false;
+    
+    // 检查是否有新的秒级设置，如果没有则从分钟级设置迁移
+    if (prefs.containsKey('lock_duration_seconds')) {
+      _lockDurationSeconds = prefs.getInt('lock_duration_seconds') ?? 300;
+    } else {
+      // 从旧的分钟设置迁移
+      final oldMinutes = prefs.getInt('lock_duration_minutes') ?? 5;
+      _lockDurationSeconds = oldMinutes * 60;
+    }
+    
+    _maxAttempts = prefs.getInt('max_attempts') ?? 5;
     notifyListeners();
   }
 
@@ -98,6 +114,26 @@ class SecurityManager extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _autoBiometric = value;
     await prefs.setBool('auto_biometric', value);
+    notifyListeners();
+  }
+
+  Future<void> setLockDurationMinutes(int value) async {
+    await setLockDurationSeconds(value * 60);
+  }
+
+  Future<void> setLockDurationSeconds(int value) async {
+    final prefs = await SharedPreferences.getInstance();
+    _lockDurationSeconds = value;
+    await prefs.setInt('lock_duration_seconds', value);
+    // 同时更新分钟设置以保持兼容性
+    await prefs.setInt('lock_duration_minutes', (value / 60).ceil());
+    notifyListeners();
+  }
+
+  Future<void> setMaxAttempts(int value) async {
+    final prefs = await SharedPreferences.getInstance();
+    _maxAttempts = value;
+    await prefs.setInt('max_attempts', value);
     notifyListeners();
   }
 }

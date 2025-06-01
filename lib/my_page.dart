@@ -785,6 +785,28 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
                   _showResetPasswordDialog();
                 },
               ),
+            if (_hasPassword)
+              ListTile(
+                leading: const Icon(Icons.timer),
+                title: const Text('锁定超时'),
+                subtitle: Text(_securityManager.lockDurationSeconds == 0 
+                    ? '已关闭' 
+                    : '错误尝试过多时的锁定时间：${_securityManager.lockDurationSeconds}秒'),
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  _showLockDurationDialog();
+                },
+              ),
+            if (_hasPassword)
+              ListTile(
+                leading: const Icon(Icons.security),
+                title: const Text('最大尝试次数'),
+                subtitle: Text('超过此次数将锁定应用：${_securityManager.maxAttempts}次'),
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  _showMaxAttemptsDialog();
+                },
+              ),
           ],
         ),
 
@@ -877,6 +899,216 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
         }
       }
     });
+  }
+
+  void _showLockDurationDialog() {
+    double selectedDurationSeconds = (_securityManager.lockDurationSeconds).toDouble();
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('设置锁定超时'),
+              content: SizedBox(
+                width: 300, // 设置固定宽度
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      selectedDurationSeconds == 0 
+                          ? '锁定功能已关闭' 
+                          : '锁定时间：${selectedDurationSeconds.round()}秒',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: selectedDurationSeconds == 0 
+                            ? Theme.of(context).colorScheme.error
+                            : Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Slider(
+                      value: selectedDurationSeconds,
+                      min: 0,
+                      max: 600,
+                      divisions: 24, // 每25秒一个刻度
+                      label: selectedDurationSeconds == 0 
+                          ? '关闭' 
+                          : '${selectedDurationSeconds.round()}秒',
+                      onChanged: (value) {
+                        setState(() {
+                          selectedDurationSeconds = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '关闭',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                          ),
+                        ),
+                        Text(
+                          '600秒',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                    // 始终显示提示信息，避免宽度变化
+                    Container(
+                      margin: const EdgeInsets.only(top: 16),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: selectedDurationSeconds == 0 
+                            ? Theme.of(context).colorScheme.errorContainer
+                            : Theme.of(context).colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            selectedDurationSeconds == 0 ? Icons.warning : Icons.info,
+                            size: 16,
+                            color: selectedDurationSeconds == 0 
+                                ? Theme.of(context).colorScheme.onErrorContainer
+                                : Theme.of(context).colorScheme.onPrimaryContainer,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              selectedDurationSeconds == 0 
+                                  ? '关闭锁定功能后，密码错误将不会锁定应用'
+                                  : '密码错误超过最大次数后，应用将被锁定指定时间',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: selectedDurationSeconds == 0 
+                                    ? Theme.of(context).colorScheme.onErrorContainer
+                                    : Theme.of(context).colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('取消'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+                TextButton(
+                  child: const Text('确认'),
+                  onPressed: () {
+                    // 将秒转换为分钟存储（向上取整）
+                    int durationSeconds = selectedDurationSeconds == 0 
+                        ? 0 
+                        : selectedDurationSeconds.round();
+                    _securityManager.setLockDurationSeconds(durationSeconds);
+                    Navigator.of(context).pop();
+                    setState(() {}); // 刷新主页面
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showMaxAttemptsDialog() {
+    double selectedAttempts = _securityManager.maxAttempts.toDouble();
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('设置最大尝试次数'),
+              content: SizedBox(
+                width: 300,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '最大尝试次数：${selectedAttempts.round()}次',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Slider(
+                      value: selectedAttempts,
+                      min: 3,
+                      max: 10,
+                      divisions: 7,
+                      label: '${selectedAttempts.round()}次',
+                      onChanged: (value) {
+                        setState(() {
+                          selectedAttempts = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '3次',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                          ),
+                        ),
+                        Text(
+                          '10次',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('取消'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+                TextButton(
+                  child: const Text('确认'),
+                  onPressed: () {
+                    _securityManager.setMaxAttempts(selectedAttempts.round());
+                    Navigator.of(context).pop();
+                    setState(() {});
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 }
 
