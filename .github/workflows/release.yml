@@ -26,6 +26,36 @@ jobs:
     - name: Get dependencies
       run: flutter pub get
     
+    - name: Setup Gradle Network Configuration
+      run: |
+        cd android
+        mkdir -p ~/.gradle
+        echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
+        echo "org.gradle.daemon=false" >> gradle.properties
+        echo "org.gradle.parallel=false" >> gradle.properties
+        echo "org.gradle.configureondemand=false" >> gradle.properties
+        echo "android.useAndroidX=true" >> gradle.properties
+        echo "android.enableJetifier=true" >> gradle.properties
+        echo "systemProp.http.socketTimeout=60000" >> gradle.properties
+        echo "systemProp.http.connectionTimeout=60000" >> gradle.properties
+    
+    - name: Cache Gradle dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+    
+    - name: Pre-download Gradle Wrapper
+      run: |
+        cd android
+        chmod +x gradlew
+        ./gradlew --version --daemon
+      continue-on-error: true
+    
     - name: Create key.properties
       run: |
         echo "storePassword=${{ secrets.STORE_PASSWORD }}" > android/key.properties
