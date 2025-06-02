@@ -26,6 +26,16 @@ jobs:
     - name: Get dependencies
       run: flutter pub get
     
+    - name: Setup Gradle
+      run: |
+        cd android
+        chmod +x gradlew
+        echo "org.gradle.jvmargs=-Xmx2048m -XX:MaxPermSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" >> gradle.properties
+        echo "org.gradle.parallel=true" >> gradle.properties
+        echo "org.gradle.configureondemand=true" >> gradle.properties
+        echo "org.gradle.daemon=false" >> gradle.properties
+        echo "org.gradle.caching=false" >> gradle.properties
+    
     - name: Create key.properties
       run: |
         echo "storePassword=${{ secrets.STORE_PASSWORD }}" > android/key.properties
@@ -76,4 +86,4 @@ jobs:
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./build/web 
+        publish_dir: ./build/web
