@@ -23,10 +23,11 @@ migrate_working_dir/
 
 # Flutter/Dart/Pub related
 **/doc/api/
-**/ios/Flutter/.last_build_id
+**/ios/Flutter/flutter_export_environment.sh
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
+.packages
 .pub-cache/
 .pub/
 /build/
@@ -42,7 +43,15 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Signing keys
-**/upload-keystore.jks
-**/key.properties
-~/keys/pwd_manager/
+# 签名相关文件 - 不要提交到Git
+android/key.properties
+android/upload-keystore.jks
+android/*.jks
+*.keystore
+**/*.p12
+**/*.p8
+**/*.mobileprovision
+
+# 临时文件
+keystore_base64.txt
+.vscode/settings.json

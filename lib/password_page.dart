@@ -356,22 +356,37 @@ ${password.note.isNotEmpty ? '\n备注：${password.note}' : ''}
                 final category = CategoryManager.getAllCategories()[index];
                 final isSelected = _selectedCategory == category.id;
                 
+                // 计算该分类的密码数量
+                final categoryCount = category.id == 'all' 
+                    ? passwords.length 
+                    : passwords.where((p) => p.category == category.id).length;
+                
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: GestureDetector(
                     onTap: () => _filterByCategory(category.id),
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeInOut,
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
                         color: isSelected 
-                            ? category.color.withOpacity(0.2)
+                            ? category.color.withOpacity(0.15)
                             : Colors.transparent,
                         border: Border.all(
                           color: isSelected 
                               ? category.color
                               : Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                          width: isSelected ? 2 : 1,
                         ),
                         borderRadius: BorderRadius.circular(20),
+                        boxShadow: isSelected ? [
+                          BoxShadow(
+                            color: category.color.withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ] : null,
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -394,6 +409,29 @@ ${password.note.isNotEmpty ? '\n备注：${password.note}' : ''}
                               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                             ),
                           ),
+                          // 添加密码数量统计
+                          if (categoryCount > 0) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isSelected 
+                                    ? category.color.withOpacity(0.2)
+                                    : Theme.of(context).colorScheme.outline.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '$categoryCount',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isSelected 
+                                      ? category.color
+                                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -512,25 +550,120 @@ ${password.note.isNotEmpty ? '\n备注：${password.note}' : ''}
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              Icons.lock_outline,
-                              size: 64,
-                              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              '还没有保存的密码',
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            // 区分是搜索无结果还是真的没有密码
+                            if (_searchController.text.isNotEmpty || _selectedCategory != 'all') ...[
+                              // 搜索/筛选无结果状态
+                              Icon(
+                                Icons.search_off,
+                                size: 64,
                                 color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '点击右下角的按钮添加新密码',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Theme.of(context).textTheme.bodySmall?.color,
+                              const SizedBox(height: 16),
+                              Text(
+                                '未找到匹配的密码',
+                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: 8),
+                              if (_searchController.text.isNotEmpty)
+                                Text(
+                                  '尝试搜索 "${_searchController.text}" 的其他关键词',
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Theme.of(context).textTheme.bodySmall?.color,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                )
+                              else
+                                Text(
+                                  '该分类下暂无密码记录',
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Theme.of(context).textTheme.bodySmall?.color,
+                                  ),
+                                ),
+                              const SizedBox(height: 16),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (_searchController.text.isNotEmpty)
+                                    TextButton.icon(
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        _filterPasswords('');
+                                      },
+                                      icon: const Icon(Icons.clear),
+                                      label: const Text('清除搜索'),
+                                    ),
+                                  if (_selectedCategory != 'all') ...[
+                                    if (_searchController.text.isNotEmpty) const SizedBox(width: 16),
+                                    TextButton.icon(
+                                      onPressed: () => _filterByCategory('all'),
+                                      icon: const Icon(Icons.category),
+                                      label: const Text('查看全部'),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ] else ...[
+                              // 真正的空状态（没有任何密码）
+                              Icon(
+                                Icons.lock_outline,
+                                size: 64,
+                                color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                '还没有保存的密码',
+                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '点击右下角的按钮开始添加你的第一个密码',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Theme.of(context).textTheme.bodySmall?.color,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 24),
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                                  ),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      Icons.tips_and_updates,
+                                      color: Theme.of(context).colorScheme.primary,
+                                      size: 32,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      '小提示',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Theme.of(context).colorScheme.primary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '密码管理器可以帮你安全地存储所有网站和应用的登录信息',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Theme.of(context).textTheme.bodySmall?.color,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       )
@@ -607,21 +740,17 @@ ${password.note.isNotEmpty ? '\n备注：${password.note}' : ''}
       ),
       child: Card(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        elevation: password.isFavorite ? 3 : (isRecentlyViewed ? 2 : 1),
+        elevation: password.isFavorite ? 3 : 1,
         shadowColor: password.isFavorite 
             ? Colors.amber.withOpacity(0.3)
-            : (isRecentlyViewed 
-                ? Theme.of(context).colorScheme.primary.withOpacity(0.2)
-                : null),
+            : null,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
             color: password.isFavorite
                 ? Colors.amber.withOpacity(0.3)
-                : (isRecentlyViewed
-                    ? Theme.of(context).colorScheme.primary.withOpacity(0.2)
-                    : Colors.transparent),
-            width: password.isFavorite ? 1.5 : (isRecentlyViewed ? 1 : 0),
+                : Colors.transparent,
+            width: password.isFavorite ? 1.5 : 0,
           ),
         ),
         child: InkWell(
@@ -662,16 +791,7 @@ ${password.note.isNotEmpty ? '\n备注：${password.note}' : ''}
                         Colors.orange.withOpacity(0.02),
                       ],
                     )
-                  : (isRecentlyViewed
-                      ? LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Theme.of(context).colorScheme.primary.withOpacity(0.03),
-                            Theme.of(context).colorScheme.primary.withOpacity(0.01),
-                          ],
-                        )
-                      : null),
+                  : null,
             ),
             child: Column(
               children: [
@@ -1086,27 +1206,61 @@ ${password.note.isNotEmpty ? '\n备注：${password.note}' : ''}
     ];
     final strengthLabels = ['弱', '中', '强'];
     
+    // 计算强度百分比
+    final strengthPercentage = (strength + 1) / 3.0;
+    
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 密码强度圆点
+          // 色彩填充圆环
           Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: strengthColors[strength],
-              shape: BoxShape.circle,
+            width: 16,
+            height: 16,
+            child: Stack(
+              children: [
+                // 背景圆环
+                Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: strengthColors[strength].withOpacity(0.2),
+                  ),
+                ),
+                // 填充圆环
+                Container(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    value: strengthPercentage,
+                    strokeWidth: 2.5,
+                    backgroundColor: Colors.transparent,
+                    valueColor: AlwaysStoppedAnimation<Color>(strengthColors[strength]),
+                  ),
+                ),
+                // 中心圆点
+                Center(
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: strengthColors[strength],
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 6),
           Text(
             strengthLabels[strength],
             style: TextStyle(
               fontSize: 10,
               color: strengthColors[strength],
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
