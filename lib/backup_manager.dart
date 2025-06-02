@@ -3,19 +3,42 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'databasehelper.dart';
+import 'crypto_manager.dart';
 
 class BackupManager {
   static final BackupManager _instance = BackupManager._internal();
   factory BackupManager() => _instance;
   final DatabaseHelper _dbHelper = DatabaseHelper();
 
-  // 使用与数据库相同的加密密钥
-  static final encrypt.Key _key = encrypt.Key.fromUtf8('my32lengthsupersecretnooneknows1');
-  static final encrypt.IV _iv = encrypt.IV.fromUtf8('uigtrefghingftxp');
+  // 移除硬编码的密钥，改为使用CryptoManager提供的动态密钥
   late final encrypt.Encrypter _encrypter;
 
   BackupManager._internal() {
-    _encrypter = encrypt.Encrypter(encrypt.AES(_key));
+    // 初始化加密器，但密钥将动态获取
+    _encrypter = encrypt.Encrypter(encrypt.AES(encrypt.Key.fromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=')));
+  }
+
+  /// 获取当前的加密密钥
+  encrypt.Key get _key {
+    final cachedKey = CryptoManager.getCachedKey();
+    if (cachedKey == null) {
+      throw Exception('加密密钥不可用，请先验证加密密码');
+    }
+    return cachedKey;
+  }
+
+  /// 获取当前的IV
+  encrypt.IV get _iv {
+    final cachedIV = CryptoManager.getCachedIV();
+    if (cachedIV == null) {
+      throw Exception('加密IV不可用，请先验证加密密码');
+    }
+    return cachedIV;
+  }
+
+  /// 获取实时的加密器
+  encrypt.Encrypter get _currentEncrypter {
+    return encrypt.Encrypter(encrypt.AES(_key));
   }
 
   Future<String> exportData() async {
@@ -30,8 +53,8 @@ class BackupManager {
         'data': passwords,
       });
 
-      // 加密数据
-      final encrypted = _encrypter.encrypt(jsonData, iv: _iv);
+      // 使用动态密钥加密数据
+      final encrypted = _currentEncrypter.encrypt(jsonData, iv: _iv);
       
       // 获取应用文档目录
       final directory = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
@@ -53,8 +76,8 @@ class BackupManager {
       final file = File(filePath);
       final encryptedData = await file.readAsString();
       
-      // 解密数据
-      final decrypted = _encrypter.decrypt64(encryptedData, iv: _iv);
+      // 使用动态密钥解密数据
+      final decrypted = _currentEncrypter.decrypt64(encryptedData, iv: _iv);
       
       // 解析JSON
       final jsonData = jsonDecode(decrypted);

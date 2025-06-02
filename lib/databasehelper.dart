@@ -5,24 +5,47 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'dart:io';
+import 'crypto_manager.dart';
 
 class DatabaseHelper extends ChangeNotifier {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
   factory DatabaseHelper() => _instance;
   static Database? _database;
 
-  // 使用 AES 加密的密钥
-  static final encrypt.Key _key = encrypt.Key.fromUtf8('my32lengthsupersecretnooneknows1');
-  static final encrypt.IV _iv = encrypt.IV.fromUtf8('uigtrefghingftxp'); // 16个字符
+  // 移除硬编码的密钥，改为使用CryptoManager提供的动态密钥
   late final encrypt.Encrypter _encrypter;
 
   DatabaseHelper._internal() {
-    _encrypter = encrypt.Encrypter(encrypt.AES(_key));
+    // 初始化加密器，但密钥将动态获取
+    _encrypter = encrypt.Encrypter(encrypt.AES(encrypt.Key.fromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=')));
     // 初始化数据库
     if (Platform.isLinux || Platform.isWindows) {
       sqfliteFfiInit();
       databaseFactory = databaseFactoryFfi;
     }
+  }
+
+  /// 获取当前的加密密钥
+  encrypt.Key get _key {
+    final cachedKey = CryptoManager.getCachedKey();
+    if (cachedKey == null) {
+      throw Exception('加密密钥不可用，请先验证加密密码');
+    }
+    return cachedKey;
+  }
+
+  /// 获取当前的IV
+  encrypt.IV get _iv {
+    final cachedIV = CryptoManager.getCachedIV();
+    if (cachedIV == null) {
+      throw Exception('加密IV不可用，请先验证加密密码');
+    }
+    return cachedIV;
+  }
+
+  /// 获取实时的加密器
+  encrypt.Encrypter get _currentEncrypter {
+    return encrypt.Encrypter(encrypt.AES(_key));
   }
 
   Future<Database> get database async {
@@ -85,13 +108,16 @@ class DatabaseHelper extends ChangeNotifier {
     // 确保输入字符串有效
     if (data.isEmpty) return '';
 
-    // 使用 UTF-8 编码
-    List<int> bytes = utf8.encode(data);
+    try {
+      // 使用 UTF-8 编码
+      List<int> bytes = utf8.encode(data);
 
-    // 进行 AES 加密
-    final encrypted = _encrypter.encryptBytes(bytes, iv: _iv);
-    print('Encrypted: ${encrypted.base64}'); // 添加调试日志
-    return encrypted.base64;
+      // 进行 AES 加密，使用动态密钥
+      final encrypted = _currentEncrypter.encryptBytes(bytes, iv: _iv);
+      return encrypted.base64;
+    } catch (e) {
+      throw Exception('加密失败: $e');
+    }
   }
 
   String doDecrypt(String encryptedData) {
@@ -105,14 +131,12 @@ class DatabaseHelper extends ChangeNotifier {
       if (encryptedBytes.length % 16 != 0) {
         throw Exception('Invalid encrypted data length');
       }
-      final decryptedBytes = _encrypter.decryptBytes(encrypt.Encrypted(encryptedBytes), iv: _iv);
+      final decryptedBytes = _currentEncrypter.decryptBytes(encrypt.Encrypted(encryptedBytes), iv: _iv);
       final decryptedString = utf8.decode(decryptedBytes);
-      print('Decrypted: $decryptedString'); // 添加调试日志
       return decryptedString; // 将字节数组转回字符串
     } catch (e) {
-      // 如果解密失败，返回原字符串
-      print('Decryption failed: $e'); // 添加调试日志
-      return encryptedData;
+      // 如果解密失败，抛出异常而不是返回原字符串
+      throw Exception('解密失败: $e');
     }
   }
 
@@ -138,18 +162,24 @@ class DatabaseHelper extends ChangeNotifier {
 
     // 解密所有敏感数据
     for (var password in passwords) {
-      decryptedPasswords.add({
-        'id': password['id'],
-        'purpose': doDecrypt(password['purpose']),
-        'account': doDecrypt(password['account']),
-        'password': doDecrypt(password['password']),
-        'note': doDecrypt(password['note']),
-        'view_count': password['view_count'] ?? 0,
-        'last_viewed_time': password['last_viewed_time'],
-        'created_time': password['created_time'],
-        'is_favorite': password['is_favorite'] ?? 0,
-        'category': password['category'] ?? 'other',
-      });
+      try {
+        decryptedPasswords.add({
+          'id': password['id'],
+          'purpose': doDecrypt(password['purpose']),
+          'account': doDecrypt(password['account']),
+          'password': doDecrypt(password['password']),
+          'note': doDecrypt(password['note']),
+          'view_count': password['view_count'] ?? 0,
+          'last_viewed_time': password['last_viewed_time'],
+          'created_time': password['created_time'],
+          'is_favorite': password['is_favorite'] ?? 0,
+          'category': password['category'] ?? 'other',
+        });
+      } catch (e) {
+        // 如果解密失败，跳过这条记录或记录错误
+        print('解密密码记录失败 (ID: ${password['id']}): $e');
+        continue;
+      }
     }
 
     return decryptedPasswords;
@@ -170,20 +200,25 @@ class DatabaseHelper extends ChangeNotifier {
       whereArgs: [id],
     );
     if (result.isNotEmpty) {
-      // 创建一个新的 Map 来存储解密后的数据
-      Map<String, dynamic> decryptedPassword = {
-        'id': result.first['id'],
-        'purpose': doDecrypt(result.first['purpose']),
-        'account': doDecrypt(result.first['account']),
-        'password': doDecrypt(result.first['password']),
-        'note': doDecrypt(result.first['note']),
-        'view_count': result.first['view_count'] ?? 0,
-        'last_viewed_time': result.first['last_viewed_time'],
-        'created_time': result.first['created_time'],
-        'is_favorite': result.first['is_favorite'] ?? 0,
-        'category': result.first['category'] ?? 'other',
-      };
-      return decryptedPassword;
+      try {
+        // 创建一个新的 Map 来存储解密后的数据
+        Map<String, dynamic> decryptedPassword = {
+          'id': result.first['id'],
+          'purpose': doDecrypt(result.first['purpose']),
+          'account': doDecrypt(result.first['account']),
+          'password': doDecrypt(result.first['password']),
+          'note': doDecrypt(result.first['note']),
+          'view_count': result.first['view_count'] ?? 0,
+          'last_viewed_time': result.first['last_viewed_time'],
+          'created_time': result.first['created_time'],
+          'is_favorite': result.first['is_favorite'] ?? 0,
+          'category': result.first['category'] ?? 'other',
+        };
+        return decryptedPassword;
+      } catch (e) {
+        print('解密密码记录失败 (ID: $id): $e');
+        return null;
+      }
     }
     return null;
   }

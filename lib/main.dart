@@ -10,6 +10,8 @@ import 'authentication_page.dart';
 import 'password_auth.dart';
 import 'databasehelper.dart';
 import 'utils/password_category.dart';
+import 'welcome_page.dart';
+import 'crypto_manager.dart';
 
 // 全局主题管理器
 class ThemeManager extends ChangeNotifier {
@@ -210,7 +212,249 @@ class _MyAppState extends State<MyApp> {
       themeMode: _themeManager.followSystem 
         ? ThemeMode.system 
         : (_themeManager.darkMode ? ThemeMode.dark : ThemeMode.light),
-      home: const AuthenticationPage(title: 'PWD Manager'),
+      home: FutureBuilder<Widget>(
+        future: _determineInitialPage(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+          
+          if (snapshot.hasError) {
+            return Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      '启动失败',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${snapshot.error}',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+          
+          return snapshot.data ?? const WelcomePage();
+        },
+      ),
+    );
+  }
+
+  /// 确定应用启动时应该显示的页面
+  Future<Widget> _determineInitialPage() async {
+    try {
+      // 1. 首先检查是否设置了加密密码
+      final hasEncryptionPassword = await CryptoManager.hasEncryptionPassword();
+      
+      if (!hasEncryptionPassword) {
+        // 没有设置加密密码，显示欢迎页面进行初始设置
+        return const WelcomePage();
+      }
+      
+      // 2. 已设置加密密码，检查是否设置了访问密码
+      final hasAccessPassword = await PasswordAuth.hasPassword();
+      
+      if (hasAccessPassword) {
+        // 设置了访问密码，显示认证页面
+        return const AuthenticationPage(title: 'PWD Manager');
+      } else {
+        // 没有设置访问密码，尝试加载持久化的密钥
+        final keysLoaded = await CryptoManager.loadPersistedKeys();
+        
+        if (keysLoaded) {
+          // 成功加载密钥，直接进入主界面
+          return const MainFrame(title: 'PWD Manager');
+        } else {
+          // 没有持久化的密钥，需要验证加密密码
+          return const EncryptionPasswordVerifyPage();
+        }
+      }
+    } catch (e) {
+      // 发生错误，重新初始化
+      await CryptoManager.clearEncryptionData();
+      return const WelcomePage();
+    }
+  }
+}
+
+/// 加密密码验证页面（当没有设置访问密码时使用）
+class EncryptionPasswordVerifyPage extends StatefulWidget {
+  const EncryptionPasswordVerifyPage({super.key});
+
+  @override
+  State<EncryptionPasswordVerifyPage> createState() => _EncryptionPasswordVerifyPageState();
+}
+
+class _EncryptionPasswordVerifyPageState extends State<EncryptionPasswordVerifyPage> {
+  final TextEditingController _passwordController = TextEditingController();
+  bool _isPasswordVisible = false;
+  bool _isLoading = false;
+  String _errorMessage = '';
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _verifyPassword() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    try {
+      final isValid = await CryptoManager.verifyEncryptionPassword(_passwordController.text);
+      
+      if (isValid) {
+        // 验证成功，进入主界面
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => const MainFrame(title: 'PWD Manager'),
+            ),
+          );
+        }
+      } else {
+        setState(() {
+          _errorMessage = '密码错误，请重新输入';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = '验证失败：$e';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              Theme.of(context).colorScheme.secondary.withOpacity(0.05),
+              Theme.of(context).colorScheme.surface,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.vpn_key,
+                  size: 80,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                
+                const SizedBox(height: 32),
+                
+                Text(
+                  '请输入加密密码',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                
+                const SizedBox(height: 16),
+                
+                Text(
+                  '需要验证您的加密密码以解锁数据',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                
+                const SizedBox(height: 48),
+                
+                TextField(
+                  controller: _passwordController,
+                  obscureText: !_isPasswordVisible,
+                  onSubmitted: (_) => _verifyPassword(),
+                  decoration: InputDecoration(
+                    labelText: '加密密码',
+                    hintText: '请输入您的加密密码',
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _isPasswordVisible
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _isPasswordVisible = !_isPasswordVisible;
+                        });
+                      },
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    errorText: _errorMessage.isNotEmpty ? _errorMessage : null,
+                  ),
+                ),
+                
+                const SizedBox(height: 32),
+                
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _verifyPassword,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            '解锁',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

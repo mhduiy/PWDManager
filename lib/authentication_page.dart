@@ -9,6 +9,7 @@ import 'databasehelper.dart';
 import 'dart:io';
 import 'package:window_manager/window_manager.dart';
 import 'package:flutter/services.dart';
+import 'crypto_manager.dart';
 
 class AuthenticationPage extends StatefulWidget {
   const AuthenticationPage({
@@ -422,11 +423,23 @@ class _AuthenticationPageState extends State<AuthenticationPage> with TickerProv
     }
   }
 
-  void _onAuthenticationSuccess() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const MainFrame(title: "PWD Manager")),
-    );
+  void _onAuthenticationSuccess() async {
+    // 访问密码验证成功后，尝试加载持久化的加密密钥
+    final keysLoaded = await CryptoManager.loadPersistedKeys();
+    
+    if (keysLoaded) {
+      // 成功加载密钥，直接进入主界面
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const MainFrame(title: "PWD Manager")),
+      );
+    } else {
+      // 没有持久化的密钥，需要验证加密密码
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const EncryptionPasswordVerifyPage()),
+      );
+    }
   }
 
   Widget _buildNumberButton(String number) {

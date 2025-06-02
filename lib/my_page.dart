@@ -12,6 +12,8 @@ import 'databasehelper.dart';
 import 'main.dart';
 import 'backup_manager.dart';
 import 'package:flutter/rendering.dart';
+import 'crypto_manager.dart';
+import 'welcome_page.dart';
 
 class MyPage extends StatefulWidget {
   const MyPage({super.key, required this.title});
@@ -1084,12 +1086,12 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
               ),
             if (_hasPassword)
               _buildDangerousActionTile(
-                icon: Icons.restore,
-                title: '重置密码',
-                subtitle: '忘记密码时使用，将清除所有数据',
+                icon: Icons.restart_alt,
+                title: '完全重置',
+                subtitle: '清除所有数据并重新初始化应用',
                 onTap: () {
                   HapticFeedback.mediumImpact();
-                  _showResetPasswordDialog();
+                  _showCompleteResetDialog();
                 },
               ),
           ],
@@ -1141,49 +1143,231 @@ class _SettingsListState extends State<SettingsList> with SingleTickerProviderSt
     });
   }
 
-  void _showResetPasswordDialog() {
+  void _showCompleteResetDialog() {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('警告'),
-          content: const Text('重置密码将会清除所有存储的密码数据！此操作不可恢复，确定要继续吗？'),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('取消'),
-              onPressed: () {
-                Navigator.of(context).pop(false);
+        final TextEditingController encryptionPasswordController = TextEditingController();
+        bool isPasswordVisible = false;
+        bool isLoading = false;
+        String errorMessage = '';
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return WillPopScope(
+              onWillPop: () async {
+                if (!isLoading) {
+                  encryptionPasswordController.dispose();
+                }
+                return !isLoading;
               },
-            ),
-            TextButton(
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
+              child: AlertDialog(
+                title: Row(
+                  children: [
+                    Icon(
+                      Icons.warning,
+                      color: Colors.red,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('完全重置确认'),
+                  ],
+                ),
+                content: SizedBox(
+                  width: 300,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red.withOpacity(0.3)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '⚠️ 危险操作',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.red[700],
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '此操作将永久删除：\n• 所有保存的密码\n• 访问密码设置\n• 加密密码设置\n• 应用配置信息',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.red[600],
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 20),
+                      
+                      Text(
+                        '请输入加密密码以确认重置：',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 12),
+                      
+                      TextField(
+                        controller: encryptionPasswordController,
+                        obscureText: !isPasswordVisible,
+                        enabled: !isLoading,
+                        decoration: InputDecoration(
+                          labelText: '加密密码',
+                          hintText: '输入您的加密密码',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              isPasswordVisible
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                isPasswordVisible = !isPasswordVisible;
+                              });
+                            },
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          errorText: errorMessage.isNotEmpty ? errorMessage : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: isLoading ? null : () {
+                      encryptionPasswordController.dispose();
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text('取消'),
+                  ),
+                  ElevatedButton(
+                    onPressed: isLoading ? null : () async {
+                      if (encryptionPasswordController.text.isEmpty) {
+                        setState(() {
+                          errorMessage = '请输入加密密码';
+                        });
+                        return;
+                      }
+
+                      setState(() {
+                        isLoading = true;
+                        errorMessage = '';
+                      });
+
+                      try {
+                        // 验证加密密码
+                        final isValid = await CryptoManager.verifyEncryptionPassword(
+                          encryptionPasswordController.text,
+                        );
+
+                        if (isValid) {
+                          // 验证成功，执行完全重置
+                          await _performCompleteReset();
+                          
+                          // 跳转到欢迎页面
+                          if (mounted) {
+                            encryptionPasswordController.dispose();
+                            Navigator.of(context).pop();
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(
+                                builder: (context) => const WelcomePage(),
+                              ),
+                              (route) => false,
+                            );
+                          }
+                        } else {
+                          setState(() {
+                            errorMessage = '加密密码错误，请重新输入';
+                            isLoading = false;
+                          });
+                        }
+                      } catch (e) {
+                        setState(() {
+                          errorMessage = '验证失败：$e';
+                          isLoading = false;
+                        });
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: isLoading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text('确认重置'),
+                  ),
+                ],
               ),
-              child: const Text('确定重置'),
-              onPressed: () {
-                Navigator.of(context).pop(true);
-              },
-            ),
-          ],
+            );
+          },
         );
       },
-    ).then((confirm) async {
-      if (confirm == true) {
-        await PasswordAuth.clearPassword();
-        final dbHelper = DatabaseHelper();
-        await dbHelper.clearAllData();
-        
-        setState(() {
-          _hasPassword = false;
-        });
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('密码已重置，所有数据已清除')),
-          );
-        }
+    );
+  }
+
+  /// 执行完全重置操作
+  Future<void> _performCompleteReset() async {
+    try {
+      // 1. 清除访问密码
+      await PasswordAuth.clearPassword();
+      
+      // 2. 清除所有密码数据
+      final dbHelper = DatabaseHelper();
+      await dbHelper.clearAllData();
+      
+      // 3. 清除加密相关数据
+      await CryptoManager.clearEncryptionData();
+      
+      // 4. 清除应用设置（可选，根据需要）
+      final prefs = await SharedPreferences.getInstance();
+      // 保留主题等用户偏好设置，只清除敏感数据
+      // await prefs.clear(); // 如果要清除所有设置可以取消注释
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('应用已完全重置，所有数据已清除'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('重置失败：$e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _showLockDurationDialog() {
